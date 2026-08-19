@@ -11,6 +11,7 @@ Usage :
     fb.post_to_threads(message="Hello Threads")
 """
 
+import io
 import json
 import logging
 import random
@@ -285,17 +286,40 @@ class FacebookClient:
         """
         Upload une image sur la page Facebook et retourne son ID.
 
+        Télécharge l'image puis l'upload via multipart/form-data
+        pour éviter les erreurs de fetch par Facebook.
+
         :param image_url: URL publique de l'image à uploader
         :return: ID de la photo uploadée, ou None si échec
         """
         try:
             upload_url = f"{GRAPH_API_URL}/{config.FACEBOOK_PAGE_ID}/photos"
-            params = {
-                "access_token": config.FB_PAGE_ACCESS_TOKEN,
-                "url": image_url,
-                "published": "false",
-            }
-            response = requests.post(upload_url, data=params, timeout=30)
+
+            # 1. Téléchargement de l'image
+            image_bytes = None
+            try:
+                img_response = requests.get(image_url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+                if img_response.status_code == 200 and img_response.headers.get("content-type", "").startswith("image/"):
+                    image_bytes = img_response.content
+            except requests.RequestException as exc:
+                logger.warning("Impossible de télécharger l'image %s : %s", image_url, exc)
+
+            # 2. Upload sur Facebook
+            if image_bytes:
+                files = {"source": ("image.jpg", io.BytesIO(image_bytes), "image/jpeg")}
+                params = {
+                    "access_token": config.FB_PAGE_ACCESS_TOKEN,
+                    "published": "false",
+                }
+                response = requests.post(upload_url, params=params, files=files, timeout=30)
+            else:
+                params = {
+                    "access_token": config.FB_PAGE_ACCESS_TOKEN,
+                    "url": image_url,
+                    "published": "false",
+                }
+                response = requests.post(upload_url, data=params, timeout=30)
+
             data = response.json()
 
             if response.status_code == 200 and data.get("id"):
