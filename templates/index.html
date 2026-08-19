@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Breaking News AI — Veille Technologique</title>
+    <title>Streetweb — Veille Faits Divers & Culture Urbaine</title>
     <style>
         * {
             margin: 0;
@@ -1257,7 +1257,7 @@
             }
 
             try {
-                const response = await fetch('/api/tweet-now', {
+                const response = await fetch('/api/post-now', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ network: networks.join(',') })
@@ -1402,7 +1402,7 @@
             }
 
             try {
-                const response = await fetch('/api/tweet-now', {
+                const response = await fetch('/api/post-now', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ network: network })
@@ -1630,7 +1630,7 @@
             }
 
             try {
-                const response = await fetch('/api/tweet-now', {
+                const response = await fetch('/api/post-now', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ network: 'facebook' })
@@ -1663,7 +1663,7 @@
             }
 
             try {
-                const response = await fetch('/api/tweet-now', {
+                const response = await fetch('/api/post-now', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ network: 'facebook' })
