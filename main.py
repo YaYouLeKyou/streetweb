@@ -17,6 +17,7 @@ import sys
 import threading
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import schedule
 
@@ -45,6 +46,12 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 logger = logging.getLogger("streetweb-agent")
+
+# Set mémoire des heures déjà rattrapées pendant la durée de vie du worker
+_caught_up_times = set()
+
+# Fichier de lock pour limiter le rattrapage à 1 seul post par jour
+_CATCH_UP_LOCK_FILE = Path(".catch_up_lock")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -89,7 +96,8 @@ def publish_news_facebook(news: dict) -> bool:
             user_image_url=raw_image,
             title=news.get("title", ""),
         )
-        published = facebook.post_to_page(message=message, link=link, image_url=image_url)
+        long_text = news.get("long_text") or message
+        published = facebook.post_to_page(message=long_text, link=link, image_url=image_url)
         if published:
             logger.info("✅ Post Facebook publié : %s", news["title"][:60])
         else:
@@ -147,7 +155,8 @@ def publish_news_instagram(news: dict) -> bool:
             user_image_url=news.get("image") or "",
             title=news.get("title", ""),
         )
-        published = facebook.post_to_instagram(message=message, image_url=image_url)
+        long_text = news.get("long_text") or message
+        published = facebook.post_to_instagram(message=long_text, image_url=image_url)
         if published:
             logger.info("✅ Post Instagram publié : %s", news["title"][:60])
         else:
@@ -278,14 +287,21 @@ def _catch_up_missed_posts(schedule_times: list) -> bool:
     ou lors d'un réveil du worker (ex: plan gratuit Render qui s'endort
     après 15 min d'inactivité).
 
-    Vérifie chaque heure planifiée individuellement : si l'heure est passée
-    et qu'aucun post n'a été publié à cette heure aujourd'hui, un rattrapage
-    est effectué.
+    Limité à 1 seul post par jour via un lock fichier .catch_up_lock.
+    Ne retente pas la même heure planifiée plusieurs fois.
 
     :return: True si au moins un post de rattrapage a été exécuté, False sinon
     """
     if not schedule_times or config.NEWS_INTERVAL_HOURS > 0:
         return False
+
+    # Lock fichier : limite le rattrapage à 1 seul post par jour
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if _CATCH_UP_LOCK_FILE.exists():
+        last_lock = _CATCH_UP_LOCK_FILE.read_text(encoding="utf-8").strip()
+        if last_lock == today:
+            logger.info("Rattrapage déjà effectué aujourd'hui (%s) — skip", today)
+            return False
 
     # Les heures sont en heure de Paris — nous devons comparer en heure de Paris
     from zoneinfo import ZoneInfo
@@ -306,9 +322,10 @@ def _catch_up_missed_posts(schedule_times: list) -> bool:
         except (ValueError, TypeError):
             continue
 
-    caught_up_any = False
     # Vérifie chaque heure planifiée (ordonnée pour un rattrapage logique)
     for scheduled_time in sorted(schedule_times):
+        if scheduled_time in _caught_up_times:
+            continue
         # Si l'heure planifiée (Paris) est passée et qu'aucun post n'a été fait à cette heure
         if current_time >= scheduled_time and scheduled_time not in published_times_today:
             logger.info(
@@ -318,17 +335,15 @@ def _catch_up_missed_posts(schedule_times: list) -> bool:
             )
             try:
                 generate_news_job()
-                caught_up_any = True
+                _caught_up_times.add(scheduled_time)
+                _CATCH_UP_LOCK_FILE.write_text(today, encoding="utf-8")
+                reschedule_global()
+                logger.info("Rattrapage terminé — post manqué publié")
+                return True
             except Exception as exc:  # noqa: BLE001
                 logger.error("Erreur lors du post de rattrapage : %s", exc)
-
-    if caught_up_any:
-        # Re-planifie pour "consommer" les heures déjà passées :
-        # sans cela, `schedule.run_pending()` ré-exécuterait le job en
-        # retard, provoquant un doublon au prochain cycle.
-        reschedule_global()
-        logger.info("Rattrapage terminé — au moins un post manqué a été publié")
-        return True
+                _caught_up_times.add(scheduled_time)
+                break
 
     logger.info("Aucun post manqué — tous les posts planifiés ont été publiés")
     return False

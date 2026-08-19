@@ -126,31 +126,9 @@ def ping():
     Endpoint de réveil — utilisé par un cron externe (cron-job.org, UptimeRobot)
     pour réveiller le worker Render (plan gratuit) et exécuter les posts planifiés.
 
-    Sur le plan gratuit de Render, le worker s'endort après 15 min d'inactivité.
-    Ce ping réveille le serveur Flask et :
-      1. appelle schedule.run_pending() pour vérifier si une heure de publication
-         (07:00, 12:00, 17:00, 20:00 heure de Paris) est due ;
-      2. vérifie si une publication planifiée a été manquée pendant le sommeil
-         (ex: worker endormi à 11:59, réveillé à 14:30 → rattrape le post de 12:00).
-
-    Retourne "pong" pour confirmer que le réveil a fonctionné.
+    Ultra-léger : retourne "pong" en quelques millisecondes.
     """
-    try:
-        import schedule as schedule_module
-        schedule_module.run_pending()
-
-        # Rattrapage des posts planifiés manqués pendant que le worker dormait
-        try:
-            import main as main_module
-            main_module._catch_up_missed_posts(config.SCHEDULE_TIMES)
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Erreur lors du rattrapage des posts manqués : %s", exc)
-
-        logger.info("Ping reçu — posts planifiés vérifiés")
-        return "pong", 200
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Erreur lors du ping : %s", exc)
-        return f"erreur: {exc}", 500
+    return "pong", 200
 
 
 @app.route("/api/latest")
@@ -376,7 +354,7 @@ def api_post_now():
             try:
                 facebook = facebook_client.FacebookClient()
                 if facebook.configure():
-                    facebook_message = _build_long_post_message(news)
+                    facebook_message = news.get("long_text") or _build_long_post_message(news)
                     raw_image = news.get("image") or ""
                     facebook_image = facebook_client.get_valid_instagram_image(
                         caption=news["breaking_text"],
@@ -444,7 +422,7 @@ def api_post_now():
                         user_image_url=news.get("image"),
                         title=news.get("title", ""),
                     )
-                    instagram_message = _build_long_post_message(news)
+                    instagram_message = news.get("long_text") or _build_long_post_message(news)
                     instagram_published = facebook.post_to_instagram(
                         message=instagram_message,
                         image_url=instagram_image,

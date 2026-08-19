@@ -101,23 +101,44 @@ def generate_breaking_news(force: bool = False) -> Optional[dict]:
             logger.error("Aucune proposition générée par l'IA.")
             return None
 
-        # 4. Construction de l'objet news (principale + secondaires)
+        # 4. Génération d'un titre français pour l'article principal (avec retry)
+        main_article = best_articles[0]
+        french_title = ai_generator.generate_french_title(
+            title=main_article.title,
+            source=main_article.source,
+            summary=main_article.summary,
+        )
+        if not french_title:
+            french_title = main_article.title
+
+        # 5. Génération du long_text pour l'article principal
+        long_text = ai_generator.generate_long_post(
+            title=main_article.title,
+            url=main_article.url,
+            source=main_article.source,
+            summary=main_article.summary,
+        )
+        if not long_text:
+            long_text = proposals[0]["breaking_text"]
+
+        # 6. Construction de l'objet news (principale + secondaires)
         now = datetime.now(timezone.utc).isoformat()
         news = {
-            "title": proposals[0]["title"],
+            "title": french_title,
             "url": proposals[0]["url"],
             "source": proposals[0]["source"],
             "summary": proposals[0]["summary"],
             "breaking_text": proposals[0]["breaking_text"],
+            "long_text": long_text,
             "published_at": now,
             "secondary_proposals": proposals[1:],
             "image": proposals[0].get("image"),
         }
 
-        # 5. Stockage en base
+        # 7. Stockage en base
         database.save_breaking_news(news)
 
-        # 6. Marque tous les articles traités comme "déjà publiés" (anti-doublons)
+        # 8. Marque tous les articles traités comme "déjà publiés" (anti-doublons)
         for proposal in proposals:
             database.mark_article_processed(
                 url=proposal["url"],

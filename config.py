@@ -170,6 +170,7 @@ WEB_PORT = int(os.getenv("WEB_PORT", "5000"))
 # Publication
 # ─────────────────────────────────────────────────────────────
 MAX_POST_LENGTH = 2200  # Limite de sécurité pour les posts Facebook/Instagram
+MAX_TWEET_LENGTH = 230  # Limite pour Twitter/X
 MAX_ARTICLES_TO_PROCESS = 30  # articles maximum scannés par exécution
 
 # ─────────────────────────────────────────────────────────────
@@ -222,8 +223,8 @@ SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", SMTP_USERNAME)
 AI_SYSTEM_PROMPT = (
     "Tu es un journaliste expert en faits divers sensationnalistes et en culture urbaine. "
     "Ton style est percutant, immersif et accrocheur, adapté aux réseaux sociaux. "
-    "Tu rédiges des posts en français destinés à un public passionné de street culture, "
-    "de rap, de street art et de faits de société."
+    "Tu rédiges exclusivement en français, sans aucun mot anglais. "
+    "Tu es spécialisé dans le rap, le street art, les tendances urbaines et les faits de société."
 )
 
 AI_USER_PROMPT_TEMPLATE = (
@@ -239,7 +240,37 @@ AI_USER_PROMPT_TEMPLATE = (
     "2. Un ton journalistique percutant, avec une accroche qui capte l'attention immédiatement.\n"
     "3. Une synthèse claire des points essentiels de l'article.\n"
     "4. Termine par 3 hashtags ciblés et pertinents, par exemple #FaitsDivers #CultureUrbaine #Street.\n"
-    "5. N'utilise que du texte : pas d'emojis, pas de citation du titre exact.\n"
+    "5. N'utilise que du français : pas d'anglais, pas d'emojis, pas de citation du titre exact.\n"
+    "6. Le post doit se terminer par le lien de l'article : {url}\n"
+    "\n"
+    "Renvoie UNIQUEMENT le texte du post, sans guillemets ni commentaire."
+)
+
+AI_TITLE_PROMPT_TEMPLATE = (
+    "Voici le titre d'un article de presse : {title}\n"
+    "Source : {source}\n"
+    "Résumé : {summary}\n"
+    "\n"
+    "Rédige un nouveau titre en français, percutant et accrocheur, adapté à un public "
+    "passionné de faits divers et de culture urbaine. "
+    "Le titre doit être court (maximum 120 caractères), sans emojis, sans guillemets, "
+    "et sans aucun mot anglais. Renvoie UNIQUEMENT le titre."
+)
+
+AI_LONG_POST_PROMPT_TEMPLATE = (
+    "Voici le contenu d'un article de presse :\n"
+    "\n"
+    "Titre : {title}\n"
+    "Source : {source}\n"
+    "URL : {url}\n"
+    "Résumé : {summary}\n"
+    "\n"
+    "Rédige un post LONG en français respectant STRICTEMENT ces règles :\n"
+    "1. Maximum {max_length} caractères (compte incluant les hashtags et le lien).\n"
+    "2. Un ton journalistique percutant, avec une accroche qui capte l'attention immédiatement.\n"
+    "3. Développe les points essentiels de l'article : contexte, faits, réactions, conséquences.\n"
+    "4. Termine par 3 hashtags ciblés et pertinents, par exemple #FaitsDivers #CultureUrbaine #Street.\n"
+    "5. N'utilise que du français : pas d'anglais, pas d'emojis, pas de citation du titre exact.\n"
     "6. Le post doit se terminer par le lien de l'article : {url}\n"
     "\n"
     "Renvoie UNIQUEMENT le texte du post, sans guillemets ni commentaire."

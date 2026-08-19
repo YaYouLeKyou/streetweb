@@ -12,6 +12,7 @@ Usage :
 """
 
 import logging
+import random
 import time
 import urllib.parse
 from datetime import datetime
@@ -31,6 +32,18 @@ THREADS_REFRESH_URL = "https://graph.threads.net/refresh_access_token"
 # Cache de validation token — évite des appels réseau répétés à /debug_token
 _TOKEN_CACHE: dict = {}
 _CACHE_TTL = 120
+
+# Pool d'images de fallback pour Instagram (culture urbaine / street)
+_FALLBACK_IMAGES = [
+    "https://images.unsplash.com/photo-1493225457124-a3eb161ce9f5?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1524293233570-2ec0e8c2d177?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1506157786151-b8491531f063?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1080&h=1080&fit=crop",
+]
 
 
 def refresh_threads_token(current_token: str) -> str:
@@ -67,7 +80,7 @@ def get_valid_instagram_image(caption: str, user_image_url: str = None, title: s
     Retourne une URL d'image valide et accessible publiquement par l'API Instagram.
 
     1. Si une URL d'image valide est fournie (ex: image de l'article RSS), elle est utilisée.
-    2. Sinon, une vraie photo statique est utilisée comme fallback.
+    2. Sinon, une image aléatoire du pool de fallback est utilisée.
     """
     if user_image_url and user_image_url.startswith("http"):
         try:
@@ -78,7 +91,7 @@ def get_valid_instagram_image(caption: str, user_image_url: str = None, title: s
         except requests.RequestException:
             logger.warning("L'URL d'image RSS n'est pas accessible. Utilisation de l'image de fallback...")
 
-    fallback_image = "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1080&h=1080&fit=crop"
+    fallback_image = random.choice(_FALLBACK_IMAGES)
     logger.info("Utilisation de l'image de fallback : %s", fallback_image)
     return fallback_image
 
@@ -87,7 +100,7 @@ class FacebookClient:
     """Client pour l'API Facebook / Meta."""
 
     # Codes d'erreur Meta indiquant un token expiré/invalide
-    TOKEN_EXPIRED_CODES = {190, 467, 10, 200, 100}
+    TOKEN_EXPIRED_CODES = {190, 467, 10, 200}
 
     def __init__(self) -> None:
         self._is_configured = False
@@ -267,7 +280,43 @@ class FacebookClient:
             logger.error("Erreur inattendue (get_page_info) : %s", exc)
             return None
 
-    def post_to_page(self, message: str, link: str = "") -> bool:
+    def _upload_photo(self, image_url: str) -> Optional[str]:
+        """
+        Upload une image sur la page Facebook et retourne son ID.
+
+        :param image_url: URL publique de l'image à uploader
+        :return: ID de la photo uploadée, ou None si échec
+        """
+        try:
+            upload_url = f"{GRAPH_API_URL}/{config.FACEBOOK_PAGE_ID}/photos"
+            params = {
+                "access_token": config.FB_PAGE_ACCESS_TOKEN,
+                "url": image_url,
+                "published": "false",
+            }
+            response = requests.post(upload_url, data=params, timeout=30)
+            data = response.json()
+
+            if response.status_code == 200 and data.get("id"):
+                photo_id = data["id"]
+                logger.info("Image uploadée sur Facebook — ID : %s", photo_id)
+                return photo_id
+
+            logger.error(
+                "Erreur upload image Facebook (%d) : %s",
+                response.status_code,
+                data,
+            )
+            return None
+
+        except requests.RequestException as exc:
+            logger.error("Erreur réseau lors de l'upload de l'image Facebook : %s", exc)
+            return None
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Erreur inattendue lors de l'upload de l'image Facebook : %s", exc)
+            return None
+
+    def post_to_page(self, message: str, link: str = "", image_url: str = "") -> bool:
         """
         Publie un post sur la page Facebook.
 
@@ -296,12 +345,21 @@ class FacebookClient:
             return False
 
         try:
+            photo_id = None
+
+            if image_url:
+                photo_id = self._upload_photo(image_url)
+                if not photo_id:
+                    logger.warning("Échec de l'upload de l'image — publication sans image")
+
             params = {
                 "access_token": config.FB_PAGE_ACCESS_TOKEN,
                 "message": message,
             }
             if link:
                 params["link"] = link
+            if photo_id:
+                params["attached_media"] = json.dumps([{"media_fbid": photo_id}])
 
             url = f"{GRAPH_API_URL}/{config.FACEBOOK_PAGE_ID}/feed"
             logger.debug(

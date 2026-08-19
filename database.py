@@ -2,7 +2,7 @@
 Base de données SQLite locale — anti-doublons.
 
 Stocke les liens d'articles déjà traités afin d'éviter
-de republier la même actualité sur Twitter/X.
+de republier la même actualité sur les réseaux sociaux.
 """
 
 import sqlite3
@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS breaking_news (
     source TEXT,
     summary TEXT,
     breaking_text TEXT,
+    long_text TEXT,
     secondary_proposals TEXT,
     published_at TEXT NOT NULL DEFAULT (datetime('now')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -58,6 +59,11 @@ def init_db() -> None:
     try:
         conn.execute(CREATE_TABLE_SQL)
         conn.execute(CREATE_BREAKING_NEWS_TABLE_SQL)
+        # Migration automatique : ajoute la colonne long_text si elle n'existe pas
+        try:
+            conn.execute("ALTER TABLE breaking_news ADD COLUMN long_text TEXT")
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
         logger.info("Base de données initialisée : %s", config.DB_PATH)
     finally:
@@ -144,7 +150,7 @@ def save_breaking_news(news: dict) -> None:
     """
     Enregistre une breaking news dans la base.
 
-    :param news: dict avec title, url, source, summary, breaking_text, published_at, secondary_proposals
+    :param news: dict avec title, url, source, summary, breaking_text, long_text, published_at, secondary_proposals
     """
     import json
 
@@ -154,8 +160,8 @@ def save_breaking_news(news: dict) -> None:
         conn.execute(
             """
             INSERT INTO breaking_news
-                (title, url, source, summary, breaking_text, secondary_proposals, published_at, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (title, url, source, summary, breaking_text, long_text, secondary_proposals, published_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 news.get("title", ""),
@@ -163,6 +169,7 @@ def save_breaking_news(news: dict) -> None:
                 news.get("source", ""),
                 news.get("summary", ""),
                 news.get("breaking_text", ""),
+                news.get("long_text", ""),
                 secondary,
                 news.get("published_at", datetime.now(timezone.utc).isoformat()),
                 datetime.now(timezone.utc).isoformat(),
