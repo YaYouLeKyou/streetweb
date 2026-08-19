@@ -1,0 +1,121 @@
+# Configuration Render — Agent Twitter Veille IA & Tech
+# Type : Web Service (serveur Flask + worker intégré)
+#
+# Important : le type "web" (au lieu de "worker") est nécessaire pour que
+# l'endpoint /ping soit accessible publiquement. Cela permet à un cron
+# externe gratuit (cron-job.org, UptimeRobot) de réveiller le service
+# sur le plan gratuit Render et de garantir 4 posts/jour.
+#
+# Déploiement :
+#   1. Poussez ce dépôt sur GitHub
+#   2. Sur Render : New → Blueprint → sélectionnez le dépôt
+#   3. Cette configuration crée automatiquement le service web
+#   4. Ajoutez les variables d'environnement ci-dessous en secrets
+
+services:
+  - type: web
+    name: twitter-agency-news-bot
+    runtime: python
+    plan: free  # ou starter si besoin de plus de ressources
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    healthCheckPath: /ping
+    envVars:
+      # ── Clés API Twitter (X) V2 ────────────────────────────
+      - key: TWITTER_API_KEY
+        sync: false  # valeur à renseigner dans le dashboard Render
+      - key: TWITTER_API_SECRET
+        sync: false
+      - key: TWITTER_ACCESS_TOKEN
+        sync: false
+      - key: TWITTER_ACCESS_SECRET
+        sync: false
+      - key: TWITTER_BEARER_TOKEN
+        sync: false
+
+      # ── Clé API LLM (Gemini — OpenAI SDK compatible) ───────
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai/
+      - key: LLM_MODEL
+        value: gemini-3.5-flash-lite
+
+      # ── Planification (optionnel) ──────────────────────────
+      # Défaut : 08:00, 12:00, 17:00, 20:00 UTC (4 posts/jour)
+      - key: SCHEDULE_TIMES
+        value: "08:00,12:00,17:00,20:00"
+
+      # ── Fréquence alternative (si SCHEDULE_TIMES est vide) ─
+      # 0 = désactivé — utilise les heures fixes SCHEDULE_TIMES
+      - key: NEWS_INTERVAL_HOURS
+        value: "0"
+
+      # ── Port du serveur web ────────────────────────────────
+      - key: WEB_PORT
+        value: "5000"
+
+      # ── Mode test au démarrage ─────────────────────────────
+      # true = publie un tweet immédiatement au lancement
+      - key: TEST_ON_STARTUP
+        value: "false"
+
+      # ── Mode simulation (Dry-Run) ──────────────────────────
+      # true  = affiche le tweet dans la console, ne publie PAS sur Twitter
+      # false = publie réellement sur Twitter (comportement normal)
+      - key: DRY_RUN
+        value: "false"
+
+      # ── API Facebook / Meta (Graph API) ─────────────────────
+      # Page Access Token (permanent) avec permissions :
+      #   pages_read_engagement, pages_manage_posts
+      #   instagram_content_publish (optionnel, pour Instagram)
+      - key: FB_PAGE_ACCESS_TOKEN
+        sync: false
+      - key: FACEBOOK_PAGE_ID
+        sync: false
+      - key: INSTAGRAM_ACCOUNT_ID
+        sync: false  # optionnel — lié à une page Instagram Business
+
+      # ── Renouvellement automatique des tokens ───────────────
+      # Identifiants de l'application Facebook (nécessaires pour fb_exchange_token)
+      # https://developers.facebook.com/apps/ → votre app → Paramètres → Identifiants
+      - key: FB_APP_ID
+        sync: false
+      - key: FB_APP_SECRET
+        sync: false
+
+      # Nombre de jours entre deux renouvellements automatiques des tokens.
+      # Les tokens Meta/Threads durent 60 jours — un renouvellement tous les
+      # 30 jours garantit une marge de sécurité confortable.
+      - key: TOKEN_RENEWAL_DAYS
+        value: "30"
+
+      # ── API Threads (Meta) ──────────────────────────────────
+      - key: THREADS_USER_ID
+        sync: false
+      - key: THREADS_ACCESS_TOKEN
+        sync: false
+
+      # ── Notification email (alerte token expiré) ────────────
+      # Adresse qui reçoit les alertes de token expiré
+      - key: ALERT_EMAIL
+        value: "yanes75@hotmail.fr"
+
+      # Activation de l'envoi d'emails (true/false)
+      - key: SMTP_ENABLED
+        value: "false"
+
+      # Configuration SMTP
+      - key: SMTP_HOST
+        value: "smtp-mail.outlook.com"
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_TLS
+        value: "true"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        value: "yanes75@hotmail.fr"
