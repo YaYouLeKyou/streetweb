@@ -1,10 +1,10 @@
 """
-Script de publication immédiate — post groupé sur Facebook, Instagram et Twitter.
+Script de publication immédiate — post groupé sur Facebook et Instagram.
 
 Usage :
     python publish_now.py
 
-Génère une breaking news et la publie sur les 3 plateformes.
+Génère un post et le publie sur les 2 plateformes.
 """
 
 import logging
@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 import config
 import database
 import news_service
-from main import publish_news_tweet, publish_news_facebook, publish_news_instagram, publish_news_threads
+from main import publish_news_facebook, publish_news_instagram
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,42 +26,32 @@ logger = logging.getLogger("publish-now")
 
 
 def main() -> None:
-    """Génère et publie une breaking news sur les 3 plateformes."""
-    logger.info("🚀 Publication immédiate d'une breaking news groupée")
+    """Génère et publie un post sur les 2 plateformes (Facebook + Instagram)."""
+    logger.info("🚀 Publication immédiate d'un post groupé Streetweb")
     logger.info("Heure serveur (UTC) : %s", datetime.now(timezone.utc).strftime("%H:%M:%S"))
     logger.info("Mode dry-run : %s", config.DRY_RUN)
 
     # 1. Initialisation de la base de données
     database.init_db()
 
-    # 2. Génération de la breaking news
-    logger.info("=== Génération de la breaking news ===")
+    # 2. Génération du post
+    logger.info("=== Génération du post ===")
     news = news_service.generate_breaking_news()
     if not news:
-        logger.error("❌ Échec de la génération de la breaking news")
+        logger.error("❌ Échec de la génération du post")
         sys.exit(1)
 
-    logger.info("✅ Breaking news générée : %s", news["title"][:80])
+    logger.info("✅ Post généré : %s", news["title"][:80])
     logger.info("   Texte : %s", news["breaking_text"][:120])
 
-    # 3. Publication sur les 4 plateformes
+    # 3. Publication sur Facebook et Instagram
     results = {}
 
-    # Threads
-    logger.info("── Publication sur Threads ──")
-    results["threads"] = publish_news_threads(news)
-
-    # Facebook
     logger.info("── Publication sur Facebook ──")
     results["facebook"] = publish_news_facebook(news)
 
-    # Instagram
     logger.info("── Publication sur Instagram ──")
     results["instagram"] = publish_news_instagram(news)
-
-    # Twitter
-    logger.info("── Publication sur Twitter ──")
-    results["twitter"] = publish_news_tweet(news)
 
     # 4. Résumé
     logger.info("=" * 60)
