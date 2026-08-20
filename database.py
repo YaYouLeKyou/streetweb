@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS processed_articles (
     url TEXT NOT NULL UNIQUE,
     title TEXT,
     source TEXT,
-    tweet_text TEXT,
+    post_text TEXT,
     published_at TEXT NOT NULL DEFAULT (datetime('now')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -94,7 +94,7 @@ def mark_article_processed(
     url: str,
     title: str = "",
     source: str = "",
-    tweet_text: str = "",
+    post_text: str = "",
 ) -> None:
     """
     Enregistre un article comme traité dans la base.
@@ -102,7 +102,7 @@ def mark_article_processed(
     :param url: URL canonique de l'article (clé unique)
     :param title: Titre de l'article
     :param source: Nom de la source RSS
-    :param tweet_text: Texte du tweet généré / publié
+    :param post_text: Texte du post généré / publié
     """
     conn = get_connection()
     try:
@@ -110,10 +110,10 @@ def mark_article_processed(
         conn.execute(
             """
             INSERT OR IGNORE INTO processed_articles
-                (url, title, source, tweet_text, published_at, created_at)
+                (url, title, source, post_text, published_at, created_at)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (url, title, source, tweet_text, now, now),
+            (url, title, source, post_text, now, now),
         )
         conn.commit()
         logger.info("Article enregistré comme traité : %s", url)

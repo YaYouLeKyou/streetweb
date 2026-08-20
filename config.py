@@ -52,9 +52,6 @@ FB_APP_SECRET = os.getenv("FB_APP_SECRET", "")
 # 30 jours garantit une marge de sécurité confortable.
 TOKEN_RENEWAL_DAYS = int(os.getenv("TOKEN_RENEWAL_DAYS", "30"))
 
-# Token Threads (non utilisé dans Streetweb, conservé pour compatibilité)
-THREADS_ACCESS_TOKEN = os.getenv("THREADS_ACCESS_TOKEN", "")
-
 # ─────────────────────────────────────────────────────────────
 # Flux RSS spécialisés « Faits Divers & Culture Urbaine »
 # ─────────────────────────────────────────────────────────────
@@ -173,7 +170,6 @@ WEB_PORT = int(os.getenv("WEB_PORT", "5000"))
 # Publication
 # ─────────────────────────────────────────────────────────────
 MAX_POST_LENGTH = 2200  # Limite de sécurité pour les posts Facebook/Instagram
-MAX_TWEET_LENGTH = 230  # Limite pour Twitter/X
 MAX_ARTICLES_TO_PROCESS = 30  # articles maximum scannés par exécution
 
 # ─────────────────────────────────────────────────────────────

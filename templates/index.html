@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -89,18 +89,6 @@
             color: #4267b2;
         }
 
-        .status-badge.twitter {
-            background: rgba(29, 161, 242, 0.15);
-            border: 1px solid rgba(29, 161, 242, 0.4);
-            color: #1da1f2;
-        }
-
-        .status-badge.twitter-off {
-            background: rgba(255, 173, 31, 0.15);
-            border: 1px solid rgba(255, 173, 31, 0.4);
-            color: #ffad1f;
-        }
-
         .status-badge.schedule {
             background: rgba(0, 210, 255, 0.15);
             border: 1px solid rgba(0, 210, 255, 0.4);
@@ -129,18 +117,6 @@
             background: rgba(225, 48, 108, 0.15);
             border: 1px solid rgba(225, 48, 108, 0.4);
             color: #e1306c;
-        }
-
-        .status-badge.threads-off {
-            background: rgba(255, 173, 31, 0.15);
-            border: 1px solid rgba(255, 173, 31, 0.4);
-            color: #ffad1f;
-        }
-
-        .status-badge.threads {
-            background: rgba(255, 255, 255, 0.12);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            color: #ffffff;
         }
 
         @keyframes pulse {
@@ -291,7 +267,7 @@
             cursor: pointer;
         }
 
-        .network-check.twitter-check {
+        .network-check.Facebook-check {
             border-color: rgba(29, 161, 242, 0.4);
         }
 
@@ -401,21 +377,8 @@
             box-shadow: none;
         }
 
-        .btn-tweet {
+        .btn-Post {
             background: linear-gradient(90deg, #1da1f2, #0d8bd9);
-        }
-
-        .btn-tweet:hover {
-            box-shadow: 0 5px 20px rgba(29, 161, 242, 0.3);
-        }
-
-        .btn-twitter {
-            background: linear-gradient(90deg, #1da1f2, #0d8bd9);
-            border: 1px solid rgba(29, 161, 242, 0.5);
-        }
-
-        .btn-twitter:hover {
-            box-shadow: 0 5px 20px rgba(29, 161, 242, 0.3);
         }
 
         .btn-facebook {
@@ -435,15 +398,6 @@
         .btn-instagram:hover {
             box-shadow: 0 5px 20px rgba(225, 48, 108, 0.3);
         }
-
-        .btn-threads {
-            background: linear-gradient(90deg, #000, #333);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            color: #fff;
-        }
-
-        .btn-threads:hover {
-            box-shadow: 0 5px 20px rgba(255, 255, 255, 0.25);
         }
 
         .btn-all {
@@ -491,11 +445,6 @@
             filter: grayscale(50%);
         }
 
-        .network-toggles .btn-twitter.active {
-            border-color: #1da1f2;
-            box-shadow: 0 6px 18px rgba(29, 161, 242, 0.45);
-        }
-
         .network-toggles .btn-facebook.active {
             border-color: #4267b2;
             box-shadow: 0 6px 18px rgba(66, 103, 178, 0.45);
@@ -504,11 +453,6 @@
         .network-toggles .btn-instagram.active {
             border-color: #e1306c;
             box-shadow: 0 6px 18px rgba(225, 48, 108, 0.45);
-        }
-
-        .network-toggles .btn-threads.active {
-            border-color: #ffffff;
-            box-shadow: 0 6px 18px rgba(255, 255, 255, 0.35);
         }
 
         .btn-small {
@@ -751,198 +695,7 @@
             gap: 8px;
         }
 
-        /* ── Simulation visuelle du tweet ── */
-        .tweet-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .tweet-modal.active {
-            display: flex;
-        }
-
-        .tweet-preview {
-            background: #fff;
-            color: #0f1419;
-            border-radius: 16px;
-            max-width: 600px;
-            width: 100%;
-            padding: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        }
-
-        .tweet-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 15px;
-        }
-
-        .tweet-avatar {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #1da1f2, #0d8bd9);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            color: white;
-            font-weight: bold;
-        }
-
-        .tweet-user {
-            flex: 1;
-        }
-
-        .tweet-user .name {
-            font-weight: bold;
-            font-size: 1rem;
-        }
-
-        .tweet-user .handle {
-            color: #536471;
-            font-size: 0.9rem;
-        }
-
-        .tweet-body {
-            font-size: 1.1rem;
-            line-height: 1.5;
-            margin-bottom: 15px;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
-        .tweet-body a {
-            color: #1da1f2;
-            text-decoration: none;
-        }
-
-        .tweet-body a:hover {
-            text-decoration: underline;
-        }
-
-        .tweet-card-preview {
-            background: #f7f9fa;
-            border: 1px solid #e1e8ed;
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-
-        .tweet-card-preview .card-title {
-            font-weight: bold;
-            font-size: 0.95rem;
-            margin-bottom: 5px;
-        }
-
-        .tweet-card-preview .card-source {
-            color: #536471;
-            font-size: 0.85rem;
-        }
-
-        .tweet-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-top: 1px solid #e1e8ed;
-            padding-top: 12px;
-            margin-top: 10px;
-        }
-
-        .tweet-actions {
-            display: flex;
-            gap: 20px;
-            color: #536471;
-            font-size: 0.9rem;
-        }
-
-        .tweet-actions span {
-            cursor: pointer;
-        }
-
-        .tweet-actions span:hover {
-            color: #1da1f2;
-        }
-
-        .tweet-char-count {
-            color: #536471;
-            font-size: 0.85rem;
-        }
-
-        .tweet-char-count.warning {
-            color: #ffad1f;
-        }
-
-        .tweet-char-count.danger {
-            color: #f4212e;
-        }
-
-        .tweet-modal-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-            justify-content: flex-end;
-        }
-
-        .tweet-modal-actions .btn {
-            padding: 8px 16px;
-            font-size: 0.9rem;
-        }
-
-        .btn-close {
-            background: #e1e8ed;
-            color: #0f1419;
-        }
-
-        .btn-close:hover {
-            background: #d0d9e0;
-            box-shadow: none;
-        }
-
-        .btn-publish {
-            background: #1da1f2;
-        }
-
-        .btn-publish:hover {
-            background: #0d8bd9;
-            box-shadow: 0 5px 20px rgba(29, 161, 242, 0.3);
-        }
-
-        .tweet-status {
-            margin-top: 10px;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            display: none;
-        }
-
-        .tweet-status.success {
-            background: #e8f5e9;
-            color: #2e7d32;
-            display: block;
-        }
-
-        .tweet-status.error {
-            background: #fdecea;
-            color: #c62828;
-            display: block;
-        }
-
-        .tweet-status.dry-run {
-            background: #fff3e0;
-            color: #e65100;
-            display: block;
-        }
+        
     </style>
 </head>
 <body data-dry-run="{{ 'true' if dry_run else 'false' }}">
@@ -957,10 +710,10 @@
                 {% else %}
                 <span class="status-badge live">📘 Publication Facebook</span>
                 {% endif %}
-                {% if twitter_configured %}
-                <span class="status-badge twitter-off">⏸️ Twitter désactivé</span>
+                {% if facebook_configured %}
+                <span class="status-badge facebook-off">⏸️ Facebook désactivé</span>
                 {% else %}
-                <span class="status-badge twitter-off">❌ Twitter non configuré</span>
+                <span class="status-badge facebook-off">❌ Facebook non configuré</span>
                 {% endif %}
                 {% if facebook_configured %}
                 <span class="status-badge facebook">✅ Facebook connecté</span>
@@ -968,14 +721,9 @@
                 <span class="status-badge facebook-off">❌ Facebook non configuré</span>
                 {% endif %}
                 {% if instagram_configured %}
-                <span class="status-badge instagram">✅ Instagram connecté</span>
+                <span class="status-badge instagram">✅ instagram connecté</span>
                 {% else %}
-                <span class="status-badge instagram-off">⏸️ Instagram désactivé</span>
-                {% endif %}
-                {% if threads_configured %}
-                <span class="status-badge threads">✅ Threads connecté</span>
-                {% else %}
-                <span class="status-badge threads-off">⏸️ Threads désactivé</span>
+                <span class="status-badge instagram-off">⏸️ instagram désactivé</span>
                 {% endif %}
                 <span class="status-badge schedule">🕐 Publication : {{ schedule_times|join(' & ') }} (heure de Paris)</span>
             </div>
@@ -1013,10 +761,8 @@
             <div class="controls">
                 <div class="controls-group-title">⚡ Post minute</div>
                 <div class="network-toggles">
-                    <button onclick="toggleNetwork('twitter')" class="btn btn-twitter" id="toggleTwitter">🐦 Twitter</button>
                     <button onclick="toggleNetwork('facebook')" class="btn btn-facebook" id="toggleFacebook">📘 Facebook</button>
-                    <button onclick="toggleNetwork('instagram')" class="btn btn-instagram" id="toggleInstagram">📸 Instagram</button>
-                    <button onclick="toggleNetwork('threads')" class="btn btn-threads" id="toggleThreads">🔗 Threads</button>
+                    <button onclick="toggleNetwork('instagram')" class="btn btn-instagram" id="toggleinstagram">📸 instagram</button>
                 </div>
                 <button onclick="postNow('all')" class="btn btn-all">📤 Publier maintenant</button>
                 <div class="schedule-hint">Sélectionnez les plateformes, puis cliquez sur "Publier maintenant".</div>
@@ -1049,13 +795,6 @@
                 <div class="schedule-hint">
                     Choisissez "Désactivé" pour ne publier qu'aux heures fixes, ou un intervalle pour des publications supplémentaires entre ces heures.
                 </div>
-                <button onclick="connectTwitter()" class="btn btn-twitter" id="twitterBtn">
-                    {% if twitter_configured %}
-                        ✅ Twitter connecté
-                    {% else %}
-                        🔗 Connecter Twitter
-                    {% endif %}
-                </button>
                 <button onclick="connectFacebook()" class="btn btn-facebook" id="facebookBtn">
                     {% if facebook_configured %}
                         ✅ Facebook connecté
@@ -1102,7 +841,7 @@
             <div class="actions">
                 <a href="{{ latest.url }}" target="_blank" class="btn">Lire l'article complet →</a>
                 <button onclick="refreshNews()" class="btn btn-secondary">🔄 Actualiser maintenant</button>
-                <button onclick="tweetNow()" class="btn btn-tweet">⚡ Post Now</button>
+                <button onclick="postNow("facebook")" class="btn btn-Post">⚡ Post Now</button>
             </div>
             <div class="loading" id="loading">Génération de la nouvelle breaking news en cours…</div>
         </div>
@@ -1125,7 +864,7 @@
                     <div class="proposal-text">{{ proposal.breaking_text }}</div>
                     <div class="proposal-actions">
                         <a href="{{ proposal.url }}" target="_blank" class="btn btn-small">Lire →</a>
-                        <button onclick="tweetProposal({{ loop.index }})" class="btn btn-small btn-tweet">⚡ Poster</button>
+                        <button onclick="PostProposal({{ loop.index }})" class="btn btn-small btn-Post">⚡ Poster</button>
                     </div>
                 </div>
                 {% endfor %}
@@ -1162,34 +901,26 @@
         </footer>
     </div>
 
-    <!-- Modal de simulation du tweet -->
-    <div class="tweet-modal" id="tweetModal">
-        <div class="tweet-preview">
-            <div class="tweet-header">
-                <div class="tweet-avatar">🤖</div>
-                <div class="tweet-user">
-                    <div class="name">Veille IA & Tech</div>
-                    <div class="handle">@VeilleIA_Tech</div>
-                </div>
+    
             </div>
-            <div class="tweet-body" id="tweetBody"></div>
-            <div class="tweet-card-preview" id="tweetCard">
-                <div class="card-title" id="tweetCardTitle"></div>
-                <div class="card-source" id="tweetCardSource"></div>
+            <div class="Post-body" id="PostBody"></div>
+            <div class="Post-card-preview" id="PostCard">
+                <div class="card-title" id="PostCardTitle"></div>
+                <div class="card-source" id="PostCardSource"></div>
             </div>
-            <div class="tweet-footer">
-                <div class="tweet-actions">
+            <div class="Post-footer">
+                <div class="Post-actions">
                     <span>💬</span>
                     <span>🔁</span>
                     <span>❤️</span>
                     <span>🔗</span>
                 </div>
-                <div class="tweet-char-count" id="tweetCharCount"></div>
+                <div class="Post-char-count" id="PostCharCount"></div>
             </div>
-            <div class="tweet-status" id="tweetStatus"></div>
-            <div class="tweet-modal-actions">
-                <button onclick="closeTweetModal()" class="btn btn-close">Annuler</button>
-                <button onclick="publishTweet()" class="btn btn-publish" id="publishBtn">Publier le post</button>
+            <div class="Post-status" id="PostStatus"></div>
+            <div class="Post-modal-actions">
+                <button onclick="closePostModal()" class="btn btn-close">Annuler</button>
+                <button onclick="publishPost()" class="btn btn-publish" id="publishBtn">Publier le post</button>
             </div>
         </div>
     </div>
@@ -1198,11 +929,11 @@
 
     <script>
         const DRY_RUN = document.body.dataset.dryRun === 'true';
-        let currentTweetData = null;
-        let activeNetworks = new Set(['facebook', 'instagram', 'threads']);
+        let 
+        let activeNetworks = new Set(["facebook", "instagram"]);
 
         function updateNetworkButtons() {
-            ['twitter', 'facebook', 'instagram', 'threads'].forEach(network => {
+            ['Facebook', 'facebook', 'instagram', 'instagram'].forEach(network => {
                 const btn = document.getElementById('toggle' + network.charAt(0).toUpperCase() + network.slice(1));
                 if (btn) {
                     if (activeNetworks.has(network)) {
@@ -1236,7 +967,7 @@
         });
 
         // Post minute : publie immédiatement sur les plateformes sélectionnées
-        async function postNow() {
+        async function postNow(network) {
             const networks = getSelectedNetworks();
             if (networks.length === 0) {
                 showToast('❌ Sélectionnez au moins une plateforme', true);
@@ -1247,11 +978,9 @@
             if (loading) {
                 loading.style.display = 'flex';
                 const networkLabels = {
-                    'twitter': '🐦 Envoi du post Twitter…',
                     'facebook': '📘 Envoi du post Facebook…',
                     'instagram': '📸 Envoi du post Instagram…',
-                    'threads': '🔗 Envoi du post Threads…'
-                };
+                    };
                 const labels = networks.map(n => networkLabels[n] || n).join(', ');
                 loading.textContent = labels;
             }
@@ -1286,8 +1015,8 @@
                     }, 800);
                 }
 
-                currentTweetData = data;
-                showTweetPreview(data.tweet_preview);
+                currentPostData = data;
+                showPostPreview(data.Post_preview);
             } catch (error) {
                 if (loading) loading.style.display = 'none';
                 showToast('❌ ' + error.message, true);
@@ -1392,10 +1121,8 @@
             if (loading) {
                 loading.style.display = 'block';
                 const networkLabels = {
-                    'twitter': '🐦 Envoi du post Twitter…',
                     'facebook': '📘 Envoi du post Facebook…',
                     'instagram': '📸 Envoi du post Instagram…',
-                    'threads': '🔗 Envoi du post Threads…',
                     'all': '📤 Envoi du post sur toutes les plateformes…'
                 };
                 loading.textContent = networkLabels[network] || '⏳ Publication en cours…';
@@ -1427,38 +1154,25 @@
                     }, 800);
                 }
 
-                currentTweetData = data;
-                showTweetPreview(data.tweet_preview);
+                currentPostData = data;
+                showPostPreview(data.Post_preview);
             } catch (error) {
                 if (loading) loading.style.display = 'none';
                 showToast('❌ ' + error.message, true);
             }
         }
 
-        async function connectTwitter() {
-            const btn = document.getElementById('twitterBtn');
-
-            // Ouvre la page Twitter dans un nouvel onglet
-            window.open('https://twitter.com', '_blank');
-
-            // Vérifie la connexion en arrière-plan
-            btn.disabled = true;
-            btn.textContent = '⏳ Vérification…';
-
-            try {
-                const response = await fetch('/api/twitter/connect', {
-                    method: 'POST'
-                });
+        async );
                 const data = await response.json();
 
                 if (!response.ok) {
                     throw new Error(data.error || 'Erreur lors de la connexion');
                 }
 
-                btn.textContent = '✅ Twitter connecté';
+                btn.textContent = '✅ Facebook connecté';
                 showToast('✅ ' + data.message);
             } catch (error) {
-                btn.textContent = '🔗 Connecter Twitter';
+                btn.textContent = '🔗 Connecter Facebook';
                 showToast('❌ ' + error.message, true);
             } finally {
                 btn.disabled = false;
@@ -1612,22 +1326,7 @@
             }
         }
 
-        async function tweetProposal(index) {
-            // Utilise la proposition secondaire pour le post
-            const card = document.getElementById('proposal-' + index);
-            if (!card) return;
-
-            const title = card.querySelector('h4').textContent;
-            const text = card.querySelector('.proposal-text').textContent;
-            const url = card.querySelector('.proposal-actions a').href;
-            const source = card.querySelector('.proposal-meta span').textContent.replace('📰 ', '');
-
-            // Envoie le post en direct sur Facebook (réseau par défaut)
-            const loading = document.getElementById('loading');
-            if (loading) {
-                loading.style.display = 'block';
-                loading.textContent = '📘 Envoi du post Facebook…';
-            }
+        async 
 
             try {
                 const response = await fetch('/api/post-now', {
@@ -1647,20 +1346,15 @@
                     }, 800);
                 }
 
-                currentTweetData = data;
-                showTweetPreview(data.tweet_preview);
+                currentPostData = data;
+                showPostPreview(data.Post_preview);
             } catch (error) {
                 if (loading) loading.style.display = 'none';
                 showToast('❌ ' + error.message, true);
             }
         }
 
-        async function tweetNow() {
-            const loading = document.getElementById('loading');
-            if (loading) {
-                loading.style.display = 'block';
-                loading.textContent = '⏳ Génération et publication Facebook en cours…';
-            }
+        async 
 
             try {
                 const response = await fetch('/api/post-now', {
@@ -1671,7 +1365,7 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error || 'Erreur lors de la génération du tweet');
+                    throw new Error(data.error || 'Erreur lors de la génération du Post');
                 }
 
                 if (loading && data.progress) {
@@ -1688,49 +1382,25 @@
                     }, 800);
                 }
 
-                currentTweetData = data;
-                showTweetPreview(data.tweet_preview);
+                currentPostData = data;
+                showPostPreview(data.Post_preview);
             } catch (error) {
                 if (loading) loading.style.display = 'none';
                 showToast('❌ ' + error.message, true);
             }
         }
 
-        function showTweetPreview(preview) {
-            const modal = document.getElementById('tweetModal');
-            const body = document.getElementById('tweetBody');
-            const cardTitle = document.getElementById('tweetCardTitle');
-            const cardSource = document.getElementById('tweetCardSource');
-            const charCount = document.getElementById('tweetCharCount');
-            const status = document.getElementById('tweetStatus');
-            const publishBtn = document.getElementById('publishBtn');
-
-            // Remplacer les URLs par des liens cliquables
-            let text = preview.text;
-            const urlRegex = /(https?:\/\/[^\s]+)/g;
-            text = text.replace(urlRegex, '<a href="$1" target="_blank">$1</a>');
-
-            body.innerHTML = text;
-            cardTitle.textContent = preview.title;
-            cardSource.textContent = preview.source + ' · ' + new Date(preview.published_at).toLocaleString('fr-FR');
-
-            // Compteur de caractères
-            const count = preview.character_count;
-            charCount.textContent = count + ' caractères';
-            charCount.className = 'tweet-char-count';
-            if (count > 240) {
-                charCount.classList.add('warning');
-            }
+        
             if (count > 270) {
                 charCount.classList.add('danger');
             }
 
             // Statut de publication
-            status.className = 'tweet-status';
+            status.className = 'Post-status';
             status.style.display = 'none';
-            if (currentTweetData.dry_run) {
-                status.textContent = '🧪 Mode DRY-RUN : le tweet ne sera PAS publié réellement sur Twitter.';
-                status.className = 'tweet-status dry-run';
+            if (currentPostData.dry_run) {
+                status.textContent = '🧪 Mode DRY-RUN : le Post ne sera PAS publié réellement sur Facebook.';
+                status.className = 'Post-status dry-run';
                 status.style.display = 'block';
                 publishBtn.textContent = 'Simuler la publication';
             } else {
@@ -1740,38 +1410,18 @@
             modal.classList.add('active');
         }
 
-        function closeTweetModal() {
-            document.getElementById('tweetModal').classList.remove('active');
-            currentTweetData = null;
-        }
+        
 
-        async function publishTweet() {
-            if (!currentTweetData) return;
-
-            const status = document.getElementById('tweetStatus');
-            const publishBtn = document.getElementById('publishBtn');
-            publishBtn.disabled = true;
-            publishBtn.textContent = 'Vérification…';
-
-            try {
-                if (currentTweetData.dry_run) {
-                    setTimeout(() => {
-                        status.textContent = '✅ Tweet simulé avec succès (mode DRY-RUN) — aucun tweet réel envoyé.';
-                        status.className = 'tweet-status success';
-                        status.style.display = 'block';
-                        publishBtn.disabled = false;
-                        publishBtn.textContent = 'Fermer';
-                        showToast('✅ Tweet simulé (DRY-RUN)');
-                    }, 1500);
+        async , 1500);
                     return;
                 }
 
-                const data = currentTweetData;
+                const data = currentPostData;
                 const networks = (data.network || "").split(",").filter(Boolean);
 
                 const parts = [];
-                if (networks.includes("twitter")) {
-                    parts.push(data.published ? '🐦 Twitter envoyé' : '🐦 Twitter non envoyé');
+                if (networks.includes("Facebook")) {
+                    parts.push(data.published ? '🐦 Facebook envoyé' : '🐦 Facebook non envoyé');
                 }
                 if (networks.includes("facebook")) {
                     if (data.facebook_published) {
@@ -1784,45 +1434,45 @@
                 }
                 if (networks.includes("instagram")) {
                     if (data.instagram_published) {
-                        parts.push('📸 Instagram envoyé');
+                        parts.push('📸 instagram envoyé');
                     } else if (data.instagram_error) {
-                        parts.push('📸 Instagram échec : ' + data.instagram_error);
+                        parts.push('📸 instagram échec : ' + data.instagram_error);
                     } else {
-                        parts.push('📸 Instagram non envoyé');
+                        parts.push('📸 instagram non envoyé');
                     }
                 }
-                if (networks.includes("threads")) {
-                    if (data.threads_published) {
-                        parts.push('🔗 Threads envoyé');
-                    } else if (data.threads_error) {
-                        parts.push('🔗 Threads échec : ' + data.threads_error);
+                if (networks.includes("instagram")) {
+                    if (data.instagram_published) {
+                        parts.push('🔗 instagram envoyé');
+                    } else if (data.instagram_error) {
+                        parts.push('🔗 instagram échec : ' + data.instagram_error);
                     } else {
-                        parts.push('🔗 Threads non envoyé');
+                        parts.push('🔗 instagram non envoyé');
                     }
                 }
 
                 const anySuccess = networks.some(network => {
-                    if (network === 'twitter') return data.published;
+                    if (network === 'Facebook') return data.published;
                     if (network === 'facebook') return data.facebook_published;
                     if (network === 'instagram') return data.instagram_published;
-                    if (network === 'threads') return data.threads_published;
+                    if (network === 'instagram') return data.instagram_published;
                     return false;
                 });
 
                 if (anySuccess) {
                     status.textContent = '✅ Post envoyé : ' + parts.join(' · ');
-                    status.className = 'tweet-status success';
+                    status.className = 'Post-status success';
                     status.style.display = 'block';
                     showToast('✅ ' + parts.join(' · '));
                 } else {
                     status.textContent = '⚠️ Échec de l\'envoi : ' + parts.join(' · ');
-                    status.className = 'tweet-status error';
+                    status.className = 'Post-status error';
                     status.style.display = 'block';
                     showToast('❌ Échec de la publication', true);
                 }
             } catch (error) {
                 status.textContent = '❌ ' + error.message;
-                status.className = 'tweet-status error';
+                status.className = 'Post-status error';
                 status.style.display = 'block';
                 showToast('❌ ' + error.message, true);
             } finally {
@@ -1832,9 +1482,9 @@
         }
 
         // Fermer le modal en cliquant en dehors
-        document.getElementById('tweetModal').addEventListener('click', function(e) {
+        document.getElementById('PostModal').addEventListener('click', function(e) {
             if (e.target === this) {
-                closeTweetModal();
+                closePostModal();
             }
         });
 
@@ -1855,3 +1505,5 @@
     </script>
 </body>
 </html>
+
+

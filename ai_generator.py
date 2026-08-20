@@ -53,7 +53,7 @@ def _truncate_post(text: str, url: str, max_length: int = HARD_LIMIT) -> str:
 def _clean_generated_post(raw: str) -> str:
     """Nettoie la réponse de l'IA (guillemets parasites, retours à la ligne)."""
     text = raw.strip()
-    # Retire les guillemets ouvrants/fermants si l'IA a encadré le tweet
+    # Retire les guillemets ouvrants/fermants si l'IA a encadré le post
     if len(text) >= 2 and text[0] in ('"', "'", "«") and text[-1] in ('"', "'", "»"):
         text = text[1:-1].strip()
     # Remplace les retours à la ligne par des espaces
@@ -122,7 +122,7 @@ def _fallback_post(title: str, url: str, max_length: int = HARD_LIMIT) -> str:
     return post.strip()
 
 
-def generate_tweet(title: str, url: str, source: str, summary: str = "") -> Optional[str]:
+def generate_post(title: str, url: str, source: str, summary: str = "") -> Optional[str]:
     """
     Génère un post court en français à partir d'un article.
 
@@ -148,7 +148,7 @@ def generate_tweet(title: str, url: str, source: str, summary: str = "") -> Opti
         max_tokens=300,
     )
     if not raw_post:
-        logger.warning("Mode dégradé activé pour generate_tweet : publication du lien seulement")
+        logger.warning("Mode dégradé activé pour generate_post : publication du lien seulement")
         return _fallback_post(title, url)
 
     time.sleep(config.AI_GENERATION_DELAY)

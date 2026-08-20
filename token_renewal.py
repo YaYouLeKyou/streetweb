@@ -1,13 +1,12 @@
 """
-Script de renouvellement automatique des tokens API (Facebook, Threads).
+Script de renouvellement automatique des tokens API Facebook.
 
-Vérifie la validité des tokens d'accès, les renouvelle si nécessaire,
+Vérifie la validité du token d'accès, le renouvelle si nécessaire,
 et envoie une notification email en cas de token expiré ou invalide.
 
 Fonctionnement :
   - Facebook : vérifie via /debug_token, renouvelle via fb_exchange_token
                (nécessite FB_APP_ID et FB_APP_SECRET dans la configuration)
-  - Threads  : renouvelle via /refresh_access_token (reset à 60 jours)
 
 Usage :
     python token_renewal.py              # Vérifie et renouvelle
@@ -25,7 +24,7 @@ import requests
 
 import config
 import email_notifier
-from facebook_client import refresh_threads_token, DEBUG_TOKEN_URL, GRAPH_API_URL
+from facebook_client import DEBUG_TOKEN_URL, GRAPH_API_URL
 
 logger = logging.getLogger("token-renewal")
 
@@ -140,7 +139,7 @@ def update_env_file(key: str, value: str) -> bool:
     """
     Met à jour une variable dans le fichier .env.
 
-    :param key: Nom de la variable (ex: THREADS_ACCESS_TOKEN)
+    :param key: Nom de la variable (ex: FB_PAGE_ACCESS_TOKEN)
     :param value: Nouvelle valeur
     :return: True si la mise à jour a réussi
     """
@@ -242,49 +241,7 @@ def renew_all_tokens(send_email: bool = True) -> dict:
         logger.warning("⚠️ Impossible de vérifier le token Facebook (erreur réseau)")
         results["facebook"] = {"status": "check_failed", "info": fb_info}
 
-    # ── 2. Renouvellement du token Threads ──
-    logger.info("── Renouvellement du token Threads ──")
-    if not config.THREADS_ACCESS_TOKEN:
-        logger.error("❌ THREADS_ACCESS_TOKEN manquant")
-        results["threads"] = {"status": "missing"}
-        if send_email:
-            email_notifier.send_token_expired_alert(
-                platform="Threads",
-                token_name="THREADS_ACCESS_TOKEN",
-                error_detail="THREADS_ACCESS_TOKEN non configuré",
-            )
-    else:
-        # Le refresh Threads redonne 60 jours de validité
-        logger.info("Appel à /refresh_access_token (reset à 60 jours)...")
-        new_token = refresh_threads_token(config.THREADS_ACCESS_TOKEN)
-
-        if new_token != config.THREADS_ACCESS_TOKEN:
-            config.THREADS_ACCESS_TOKEN = new_token
-            update_env_file("THREADS_ACCESS_TOKEN", new_token)
-            results["threads"] = {"status": "renewed"}
-            logger.info("✅ Token Threads renouvelé — 60 jours de validité")
-            if send_email:
-                email_notifier.send_generic_alert(
-                    subject="✅ Token Threads renouvelé avec succès",
-                    body=(
-                        "Le token Threads a été renouvelé automatiquement.\n"
-                        f"Date : {datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M UTC')}\n"
-                        "Le nouveau token a été mis à jour dans .env.\n"
-                        "⚠️ Si l'application tourne sur Render, mettez à jour "
-                        "THREADS_ACCESS_TOKEN dans le dashboard Render."
-                    ),
-                )
-        else:
-            results["threads"] = {"status": "renewal_failed"}
-            logger.error("❌ Échec du renouvellement du token Threads")
-            if send_email:
-                email_notifier.send_token_expired_alert(
-                    platform="Threads",
-                    token_name="THREADS_ACCESS_TOKEN",
-                    error_detail="Échec du rafraîchissement — token peut-être expiré",
-                )
-
-    # ── 3. Résumé ──
+    # ── 2. Résumé ──
     logger.info("=" * 60)
     logger.info("RÉSUMÉ DU RENOUVELLEMENT DES TOKENS")
     logger.info("=" * 60)
@@ -298,7 +255,7 @@ def renew_all_tokens(send_email: bool = True) -> dict:
 def main() -> None:
     """Point d'entrée du script."""
     parser = argparse.ArgumentParser(
-        description="Renouvellement automatique des tokens API (Facebook, Threads)"
+        description="Renouvellement automatique des tokens API Facebook"
     )
     parser.add_argument(
         "--check",

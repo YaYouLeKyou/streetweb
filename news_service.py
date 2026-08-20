@@ -70,7 +70,7 @@ def generate_breaking_news(force: bool = False) -> Optional[dict]:
         # 3. Génération des résumés par l'IA pour chaque article
         proposals = []
         for i, article in enumerate(best_articles):
-            breaking_text = ai_generator.generate_tweet(
+            breaking_text = ai_generator.generate_post(
                 title=article.title,
                 url=article.url,
                 source=article.source,
@@ -84,7 +84,7 @@ def generate_breaking_news(force: bool = False) -> Optional[dict]:
                     url=article.url,
                     title=article.title,
                     source=article.source,
-                    tweet_text="",
+                    post_text="",
                 )
                 continue
 
@@ -144,7 +144,7 @@ def generate_breaking_news(force: bool = False) -> Optional[dict]:
                 url=proposal["url"],
                 title=proposal["title"],
                 source=proposal["source"],
-                tweet_text=proposal["breaking_text"],
+                post_text=proposal["breaking_text"],
             )
 
         logger.info(
@@ -186,7 +186,7 @@ def generate_proposal() -> Optional[dict]:
         article = articles[0]
 
         # 3. Génération du texte par l'IA
-        breaking_text = ai_generator.generate_tweet(
+            breaking_text = ai_generator.generate_post(
             title=article.title,
             url=article.url,
             source=article.source,
@@ -200,7 +200,7 @@ def generate_proposal() -> Optional[dict]:
                 url=article.url,
                 title=article.title,
                 source=article.source,
-                tweet_text="",
+                    post_text="",
             )
             return None
 
@@ -218,7 +218,7 @@ def generate_proposal() -> Optional[dict]:
             url=article.url,
             title=article.title,
             source=article.source,
-            tweet_text=breaking_text,
+            post_text=breaking_text,
         )
 
         logger.info("Proposition secondaire générée : %s", article.title[:60])

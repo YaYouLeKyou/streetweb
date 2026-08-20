@@ -8,7 +8,6 @@ Usage :
     fb.configure()
     fb.post_to_page(message="Hello")
     fb.post_to_instagram(message="Hello Instagram")
-    fb.post_to_threads(message="Hello Threads")
 """
 
 import io
@@ -28,8 +27,6 @@ logger = logging.getLogger(__name__)
 
 GRAPH_API_URL = "https://graph.facebook.com/v19.0"
 DEBUG_TOKEN_URL = "https://graph.facebook.com/v19.0/debug_token"
-THREADS_API_URL = "https://graph.threads.net/v1.0"
-THREADS_REFRESH_URL = "https://graph.threads.net/refresh_access_token"
 
 # Cache de validation token — évite des appels réseau répétés à /debug_token
 _TOKEN_CACHE: dict = {}
@@ -47,35 +44,6 @@ _FALLBACK_IMAGES = [
     "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1080&h=1080&fit=crop",
 ]
 
-
-def refresh_threads_token(current_token: str) -> str:
-    """
-    Régénère le token Threads pour lui redonner 60 jours de validité.
-    Renvoie le nouveau token s'il a été rafraîchi, ou l'ancien en cas d'erreur.
-    """
-    params = {
-        "grant_type": "th_refresh_token",
-        "access_token": current_token,
-    }
-
-    try:
-        response = requests.get(THREADS_REFRESH_URL, params=params, timeout=10)
-        data = response.json()
-
-        if "access_token" in data:
-            new_token = data["access_token"]
-            logger.info("Token Threads rafraîchi avec succès pour 60 jours supplémentaires.")
-            return new_token
-
-        logger.error(
-            "Erreur lors du rafraîchissement du token Threads : %s",
-            data.get("error", data),
-        )
-        return current_token
-
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Exception lors du rafraîchissement du token Threads : %s", exc)
-        return current_token
 
 def _generate_pollinations_image(prompt: str) -> str:
     """
@@ -568,130 +536,4 @@ class FacebookClient:
             return False
         except Exception as exc:  # noqa: BLE001
             logger.error("Erreur inattendue lors de la publication Instagram : %s", exc)
-            return False
-
-    def post_to_threads(self, message: str, image_url: str = "") -> bool:
-        """
-        Publie un post texte (ou image) sur Threads via l'API Threads.
-
-        Utilise l'API Threads (https://graph.threads.net/v1.0) en 2 étapes :
-          1. Crée un container (POST /{THREADS_USER_ID}/threads)
-          2. Publie le container (POST /{THREADS_USER_ID}/threads_publish)
-
-        :param message: Contenu du post Threads
-        :param image_url: URL publique HTTPS de l'image (optionnel)
-        :return: True si publié (ou simulé), False en cas d'échec
-        """
-        if not message:
-            logger.error("Message vide — impossible de publier sur Threads")
-            return False
-
-        if not config.THREADS_USER_ID:
-            logger.error(
-                "THREADS_USER_ID manquant — impossible de publier sur Threads. "
-                "Renseignez THREADS_USER_ID dans .env"
-            )
-            return False
-
-        if not config.THREADS_ACCESS_TOKEN:
-            logger.error(
-                "THREADS_ACCESS_TOKEN manquant — impossible de publier sur Threads. "
-                "Renseignez THREADS_ACCESS_TOKEN dans .env"
-            )
-            return False
-
-        if config.DRY_RUN:
-            print("\n" + "=" * 60)
-            print("MODE TEST (DRY RUN) — POST THREADS NON ENVOYÉ")
-            print("=" * 60)
-            print(f"Threads User ID : {config.THREADS_USER_ID}")
-            print(f"Message : {message}")
-            if image_url:
-                print(f"Image URL : {image_url}")
-            print("=" * 60 + "\n")
-            logger.info("Dry-run : post Threads affiché dans la console")
-            return True
-
-        if not self._is_configured:
-            logger.error("Client Facebook non configuré — appelez configure() d'abord")
-            return False
-
-        try:
-            refreshed_token = refresh_threads_token(config.THREADS_ACCESS_TOKEN)
-            if refreshed_token != config.THREADS_ACCESS_TOKEN:
-                config.THREADS_ACCESS_TOKEN = refreshed_token
-                logger.info("Token Threads rafraîchi automatiquement avant publication.")
-
-            create_url = f"{THREADS_API_URL}/{config.THREADS_USER_ID}/threads"
-            create_params = {
-                "access_token": config.THREADS_ACCESS_TOKEN,
-                "text": message,
-            }
-
-            if image_url:
-                create_params["media_type"] = "IMAGE"
-                create_params["image_url"] = image_url
-            else:
-                create_params["media_type"] = "TEXT"
-
-            logger.debug("Création du container Threads : POST %s", create_url)
-            create_response = requests.post(create_url, data=create_params, timeout=30)
-            create_data = create_response.json()
-
-            if create_response.status_code != 200 or "id" not in create_data:
-                self._record_error(create_data)
-                logger.error(
-                    "Erreur création container Threads (%d) : code=%s message=%s | user_id=%s",
-                    create_response.status_code,
-                    create_data.get("error", {}).get("code"),
-                    create_data.get("error", {}).get("message"),
-                    config.THREADS_USER_ID,
-                )
-                logger.error("  → Réponse complète : %s", create_data)
-                return False
-
-            container_id = create_data["id"]
-            logger.info("Container Threads créé — ID : %s", container_id)
-
-            publish_url = f"{THREADS_API_URL}/{config.THREADS_USER_ID}/threads_publish"
-            publish_params = {
-                "access_token": config.THREADS_ACCESS_TOKEN,
-                "creation_id": container_id,
-            }
-
-            publish_response = None
-            publish_data = {}
-            for attempt in range(1, 4):
-                logger.debug("Publication du container Threads (tentative %d/3) : POST %s", attempt, publish_url)
-                publish_response = requests.post(publish_url, data=publish_params, timeout=30)
-                publish_data = publish_response.json() if publish_response is not None else {}
-
-                if publish_response is not None and publish_response.status_code == 200 and publish_data.get("id"):
-                    post_id = publish_data["id"]
-                    logger.info("Post Threads publié avec succès — ID : %s", post_id)
-                    return True
-
-                if publish_response is not None and publish_response.status_code == 400 and publish_data.get("error", {}).get("code") == 24:
-                    logger.warning("Threads : conteneur pas encore prêt, nouvelle tentative dans 3s...")
-                    time.sleep(3)
-                    continue
-
-                break
-
-            self._record_error(publish_data)
-            logger.error(
-                "Erreur publication Threads (%d) : code=%s message=%s | user_id=%s",
-                publish_response.status_code if publish_response is not None else -1,
-                publish_data.get("error", {}).get("code"),
-                publish_data.get("error", {}).get("message"),
-                config.THREADS_USER_ID,
-            )
-            logger.error("  → Réponse complète : %s", publish_data)
-            return False
-
-        except requests.RequestException as exc:
-            logger.error("Erreur réseau lors de la publication Threads : %s", exc)
-            return False
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Erreur inattendue lors de la publication Threads : %s", exc)
             return False
