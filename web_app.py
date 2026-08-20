@@ -126,23 +126,17 @@ def ping():
     Endpoint de réveil — utilisé par un cron externe (cron-job.org, UptimeRobot)
     pour réveiller le worker Render (plan gratuit) et exécuter les posts planifiés.
 
-    Léger : exécute schedule.run_pending() en arrière-plan et retourne "pong".
+    Exécute schedule.run_pending() et le rattrapage des posts manqués,
+    puis retourne "pong".
     """
     try:
         import schedule as schedule_module
         import main as main_module
-        import threading
 
-        def _run_schedule():
-            try:
-                schedule_module.run_pending()
-                main_module._catch_up_missed_posts(config.SCHEDULE_TIMES)
-            except Exception as exc:  # noqa: BLE001
-                logger.error("Erreur lors du traitement /ping : %s", exc)
-
-        threading.Thread(target=_run_schedule, daemon=True).start()
+        schedule_module.run_pending()
+        main_module._catch_up_missed_posts(config.SCHEDULE_TIMES)
     except Exception as exc:  # noqa: BLE001
-        logger.error("Erreur lors du ping : %s", exc)
+        logger.error("Erreur lors du traitement /ping : %s", exc)
 
     return "pong", 200
 
