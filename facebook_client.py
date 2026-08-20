@@ -75,7 +75,14 @@ def get_valid_instagram_image(caption: str, user_image_url: str = None, title: s
                 logger.info("Utilisation de l'image RSS : %s", user_image_url)
                 return user_image_url
         except requests.RequestException:
-            logger.warning("L'URL d'image RSS n'est pas accessible. Génération d'une image contextualisée...")
+            logger.warning("HEAD request failed for %s, trying GET with User-Agent...", user_image_url)
+            try:
+                res = requests.get(user_image_url, timeout=15, headers={"User-Agent": "Mozilla/5.0"}, allow_redirects=True)
+                if res.status_code == 200 and res.headers.get("content-type", "").startswith("image/"):
+                    logger.info("Utilisation de l'image RSS (GET fallback) : %s", user_image_url)
+                    return user_image_url
+            except requests.RequestException:
+                logger.warning("L'URL d'image RSS n'est pas accessible. Génération d'une image contextualisée...")
 
     # Génération d'image contextualisée via Pollinations.ai
     if title or caption:
@@ -296,16 +303,25 @@ class FacebookClient:
 
             # 1. Téléchargement de l'image
             image_bytes = None
+            content_type = "image/jpeg"
             try:
                 img_response = requests.get(image_url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
                 if img_response.status_code == 200 and img_response.headers.get("content-type", "").startswith("image/"):
                     image_bytes = img_response.content
+                    content_type = img_response.headers.get("content-type", "image/jpeg").split(";")[0].strip()
             except requests.RequestException as exc:
                 logger.warning("Impossible de télécharger l'image %s : %s", image_url, exc)
 
             # 2. Upload sur Facebook
             if image_bytes:
-                files = {"source": ("image.jpg", io.BytesIO(image_bytes), "image/jpeg")}
+                ext = "jpg"
+                if "png" in content_type:
+                    ext = "png"
+                elif "webp" in content_type:
+                    ext = "webp"
+                elif "gif" in content_type:
+                    ext = "gif"
+                files = {"source": (f"image.{ext}", io.BytesIO(image_bytes), content_type)}
                 params = {
                     "access_token": config.FB_PAGE_ACCESS_TOKEN,
                     "published": "false",
@@ -345,7 +361,8 @@ class FacebookClient:
         Publie un post sur la page Facebook.
 
         :param message: Contenu du post
-        :param link: Lien à joindre au post (optionnel)
+        :param link: Lien à joindre au post (optionnel, ignoré si image_url est fourni)
+        :param image_url: URL publique HTTPS de l'image (optionnel)
         :return: True si publié (ou simulé), False en cas d'échec
         """
         if not message:
@@ -360,6 +377,8 @@ class FacebookClient:
             print(f"Message : {message}")
             if link:
                 print(f"Lien    : {link}")
+            if image_url:
+                print(f"Image   : {image_url}")
             print("=" * 60 + "\n")
             logger.info("Dry-run : post Facebook affiché dans la console")
             return True
@@ -380,10 +399,12 @@ class FacebookClient:
                 "access_token": config.FB_PAGE_ACCESS_TOKEN,
                 "message": message,
             }
-            if link:
-                params["link"] = link
+            # Quand une image est attachée, ne pas passer "link" :
+            # Facebook ignorerait attached_media et utiliserait l'og:image du lien.
             if photo_id:
                 params["attached_media"] = json.dumps([{"media_fbid": photo_id}])
+            elif link:
+                params["link"] = link
 
             url = f"{GRAPH_API_URL}/{config.FACEBOOK_PAGE_ID}/feed"
             logger.debug(

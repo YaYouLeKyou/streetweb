@@ -12,6 +12,7 @@ Planification : 4 posts/jour (défaut 07:00, 12:00, 17:00, 20:00 heure de Paris)
 Déploiement : Render / Railway Worker (`worker: python main.py`)
 """
 
+import io
 import logging
 import sys
 import threading
@@ -39,11 +40,12 @@ from config import paris_time_to_utc, utc_time_to_paris
 # ─────────────────────────────────────────────────────────────
 # Journalisation (logs clairs formatés pour dashboard serveur)
 # ─────────────────────────────────────────────────────────────
+_utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    stream=sys.stdout,
+    stream=_utf8_stdout,
 )
 logger = logging.getLogger("streetweb-agent")
 
@@ -99,9 +101,9 @@ def publish_news_facebook(news: dict) -> bool:
         long_text = news.get("long_text") or message
         published = facebook.post_to_page(message=long_text, link=link, image_url=image_url)
         if published:
-            logger.info("✅ Post Facebook publié : %s", news["title"][:60])
+            logger.info("Post Facebook publié : %s", news["title"][:60])
         else:
-            logger.error("❌ Échec de la publication du post Facebook")
+            logger.error("Echec de la publication du post Facebook")
             # Vérifie si l'échec est dû à un token expiré
             if facebook.is_token_expired_error():
                 email_notifier.send_token_expired_alert(
@@ -140,7 +142,7 @@ def publish_news_instagram(news: dict) -> bool:
     try:
         facebook = facebook_client.FacebookClient()
         if not facebook.configure():
-            logger.error("Échec de la configuration Facebook/Instagram")
+            logger.error("Echec de la configuration Facebook/Instagram")
             # Envoi d'une alerte email si le token est expiré/invalide
             email_notifier.send_token_expired_alert(
                 platform="Instagram",
@@ -158,9 +160,9 @@ def publish_news_instagram(news: dict) -> bool:
         long_text = news.get("long_text") or message
         published = facebook.post_to_instagram(message=long_text, image_url=image_url)
         if published:
-            logger.info("✅ Post Instagram publié : %s", news["title"][:60])
+            logger.info("Post Instagram publié : %s", news["title"][:60])
         else:
-            logger.error("❌ Échec de la publication du post Instagram")
+            logger.error("Echec de la publication du post Instagram")
             # Vérifie si l'échec est dû à un token expiré
             if facebook.is_token_expired_error():
                 email_notifier.send_token_expired_alert(
@@ -183,11 +185,11 @@ def generate_news_job() -> None:
     logger.info("=== Génération planifiée d'un post ===")
     news = news_service.generate_breaking_news()
     if news:
-        logger.info("✅ Post généré : %s", news["title"][:60])
+        logger.info("Post genere : %s", news["title"][:60])
         publish_news_facebook(news)
         publish_news_instagram(news)
     else:
-        logger.warning("⚠️  Échec de la génération du post")
+        logger.warning("Echec de la generation du post")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -361,7 +363,7 @@ def start_web_server() -> None:
         daemon=True,
     )
     web_thread.start()
-    logger.info("🌐 Serveur web démarré sur le port %d", web_port)
+    logger.info("Serveur web demarre sur le port %d", web_port)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -378,7 +380,7 @@ def _generate_initial_news() -> None:
             logger.info("Génération du premier post…")
             news = news_service.generate_breaking_news()
             if news:
-                logger.info("✅ Post initial généré : %s", news["title"][:60])
+                logger.info("Post initial genere : %s", news["title"][:60])
             else:
                 logger.warning("⚠️  Échec de la génération initiale")
     except Exception as exc:  # noqa: BLE001
@@ -402,14 +404,14 @@ def _check_tokens_on_startup() -> None:
 
 def main() -> None:
     """Boucle principale : planification + publication + serveur web."""
-    logger.info("🚀 Démarrage de Streetweb — Veille Faits Divers & Culture Urbaine")
+    logger.info("Demarrage de Streetweb — Veille Faits Divers & Culture Urbaine")
     logger.info("Heure serveur (UTC) : %s", datetime.now(timezone.utc).strftime("%H:%M:%S"))
     logger.info("Mode dry-run : %s", config.DRY_RUN)
 
     # 1. Initialisation de la base de données
     database.init_db()
     stats = database.get_statistics()
-    logger.info("Base de données : %s (articles traités : %d)", config.DB_PATH, stats.get("count", 0))
+    logger.info("Base de donnees : %s (articles traites : %d)", config.DB_PATH, stats.get("count", 0))
 
     # 2. Planification des posts
     reschedule_global()
@@ -431,7 +433,7 @@ def main() -> None:
     token_check_thread.start()
 
     # 5. Boucle infinie du worker
-    logger.info("Boucle de planification active (Ctrl+C pour arrêter)…")
+    logger.info("Boucle de planification active (Ctrl+C pour arreter)…")
     try:
         while True:
             schedule.run_pending()

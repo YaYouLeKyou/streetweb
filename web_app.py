@@ -572,7 +572,7 @@ def api_facebook_diagnostic():
 
 def run_web_server(host: str = "0.0.0.0", port: int = 5000) -> None:
     """Lance le serveur web Flask."""
-    logger.info("🚀 Serveur web démarré sur http://%s:%d", host, port)
+    logger.info("Serveur web demarre sur http://%s:%d", host, port)
     app.run(host=host, port=port, debug=False, use_reloader=False)
 
 
