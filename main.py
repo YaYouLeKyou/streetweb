@@ -35,7 +35,7 @@ from web_app import _build_long_post_message
 from facebook_client import get_valid_instagram_image
 
 # Conversion heure de Paris ↔ UTC
-from config import paris_time_to_utc, utc_time_to_paris
+from config import get_paris_tz, paris_time_to_utc, utc_time_to_paris
 
 # ─────────────────────────────────────────────────────────────
 # Journalisation (logs clairs formatés pour dashboard serveur)
@@ -51,9 +51,6 @@ logger = logging.getLogger("streetweb-agent")
 
 # Set mémoire des heures déjà rattrapées pendant la durée de vie du worker
 _caught_up_times = set()
-
-# Fichier de lock pour limiter le rattrapage à 1 seul post par jour
-_CATCH_UP_LOCK_FILE = Path(".catch_up_lock")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -243,10 +240,18 @@ def setup_schedule() -> None:
         else:
             for time_str in schedule_times:
                 # Les heures de la config sont TOUJOURS en heure de Paris.
-                # Le paramètre `tz` de schedule gère automatiquement l'heure
-                # d'été (UTC+2) et l'heure d'hiver (UTC+1) — pas de conversion manuelle.
-                schedule.every().day.at(time_str, tz=config.LOCAL_TIMEZONE).do(generate_news_job)
-                logger.info("Post planifié : %s (heure Paris)", time_str)
+                # Conversion explicite Paris → UTC : le worker Render/Railway
+                # tourne en UTC, et on évite ainsi toute dépendance au
+                # paramètre `tz` de la librairie `schedule` (source de bugs).
+                # La conversion gère automatiquement l'heure d'été (UTC+2)
+                # et l'heure d'hiver (UTC+1).
+                utc_time = paris_time_to_utc(time_str)
+                schedule.every().day.at(utc_time).do(generate_news_job)
+                logger.info(
+                    "Post planifié : %s (heure Paris = %s UTC)",
+                    time_str,
+                    utc_time,
+                )
 
             if not schedule_times:
                 # Protection contre schedule.every(0).hours (heure locale invalide).
@@ -285,33 +290,24 @@ def reschedule_global() -> None:
 
 def _catch_up_missed_posts(schedule_times: list) -> bool:
     """
-    Vérifie si une publication planifiée a été manquée au démarrage
-    ou lors d'un réveil du worker (ex: plan gratuit Render qui s'endort
+    Vérifie si des publications planifiées ont été manquées au démarrage
+    ou lors d'un réveil du worker (ex : plan gratuit Render qui s'endort
     après 15 min d'inactivité).
 
-    Limité à 1 seul post par jour via un lock fichier .catch_up_lock.
-    Ne retente pas la même heure planifiée plusieurs fois.
+    RATTRAPE TOUS LES POSTS MANQUÉS (pas seulement un seul).
+    Ne retente pas deux fois la même heure planifiée.
 
     :return: True si au moins un post de rattrapage a été exécuté, False sinon
     """
     if not schedule_times or config.NEWS_INTERVAL_HOURS > 0:
         return False
 
-    # Lock fichier : limite le rattrapage à 1 seul post par jour
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    if _CATCH_UP_LOCK_FILE.exists():
-        last_lock = _CATCH_UP_LOCK_FILE.read_text(encoding="utf-8").strip()
-        if last_lock == today:
-            logger.info("Rattrapage déjà effectué aujourd'hui (%s) — skip", today)
-            return False
-
     # Les heures sont en heure de Paris — nous devons comparer en heure de Paris
-    from zoneinfo import ZoneInfo
-    paris_tz = ZoneInfo(config.LOCAL_TIMEZONE)
+    paris_tz = get_paris_tz()
     now = datetime.now(paris_tz)  # heure de Paris
     current_time = now.strftime("%H:%M")
 
-    # Récupère les posts publiés aujourd'hui (publiés en UTC, convertis en heure Paris)
+    # Récupère les posts publiés aujourd'hui (publiés en UTC, convertis en heure de Paris)
     published_times_today = set()
     history = database.get_breaking_news_history(limit=50)
     for item in history:
@@ -324,6 +320,7 @@ def _catch_up_missed_posts(schedule_times: list) -> bool:
         except (ValueError, TypeError):
             continue
 
+    caught_up = 0
     # Vérifie chaque heure planifiée (ordonnée pour un rattrapage logique)
     for scheduled_time in sorted(schedule_times):
         if scheduled_time in _caught_up_times:
@@ -331,24 +328,27 @@ def _catch_up_missed_posts(schedule_times: list) -> bool:
         # Si l'heure planifiée (Paris) est passée et qu'aucun post n'a été fait à cette heure
         if current_time >= scheduled_time and scheduled_time not in published_times_today:
             logger.info(
-                "Post planifié à %s (heure Paris) manqué (dernier post : %s) — rattrapage en cours",
+                "Post planifié à %s (heure de Paris) manqué (déjà publiés : %s) — rattrapage en cours",
                 scheduled_time,
                 sorted(published_times_today) if published_times_today else "aucun",
             )
             try:
                 generate_news_job()
                 _caught_up_times.add(scheduled_time)
-                _CATCH_UP_LOCK_FILE.write_text(today, encoding="utf-8")
-                reschedule_global()
-                logger.info("Rattrapage terminé — post manqué publié")
-                return True
+                published_times_today.add(scheduled_time)
+                caught_up += 1
+                logger.info("Rattrapage réussi — post manqué à %s publié", scheduled_time)
             except Exception as exc:  # noqa: BLE001
                 logger.error("Erreur lors du post de rattrapage : %s", exc)
                 _caught_up_times.add(scheduled_time)
                 break
 
-    logger.info("Aucun post manqué — tous les posts planifiés ont été publiés")
-    return False
+    if caught_up:
+        # Replanifions car les heures de rattrapage ne doivent pas re-déclencher
+        reschedule_global()
+    else:
+        logger.info("Aucun post manqué — tous les posts planifiés ont été publiés")
+    return caught_up > 0
 
 
 # ─────────────────────────────────────────────────────────────

@@ -20,6 +20,7 @@ import database
 import email_notifier
 import facebook_client
 import news_service
+from config import get_paris_tz
 
 logger = logging.getLogger(__name__)
 
@@ -69,12 +70,10 @@ def _format_date(iso_str: str) -> str:
     if not iso_str:
         return ""
     try:
-        from zoneinfo import ZoneInfo
-
         dt = datetime.fromisoformat(iso_str)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        paris_dt = dt.astimezone(ZoneInfo(config.LOCAL_TIMEZONE))
+        paris_dt = dt.astimezone(get_paris_tz())
         return paris_dt.strftime("%d/%m/%Y à %H:%M")
     except (ValueError, TypeError):
         return iso_str
@@ -100,8 +99,7 @@ def index():
     facebook_configured = bool(config.FB_PAGE_ACCESS_TOKEN and config.FACEBOOK_PAGE_ID)
     instagram_configured = bool(config.FB_PAGE_ACCESS_TOKEN and config.INSTAGRAM_ACCOUNT_ID)
 
-    from zoneinfo import ZoneInfo
-    paris_now = datetime.now(ZoneInfo(config.LOCAL_TIMEZONE))
+    paris_now = datetime.now(get_paris_tz())
     return render_template(
         "index.html",
         latest=latest,

@@ -105,6 +105,30 @@ else:
 NEWS_INTERVAL_HOURS = int(os.getenv("NEWS_INTERVAL_HOURS", "0"))
 
 
+def get_paris_tz():
+    """
+    Retourne le fuseau horaire de Paris.
+    Utilise zoneinfo (stdlib) avec fallback pytz si indisponible.
+
+    :return: Objet tzinfo (zoneinfo.ZoneInfo ou pytz.timezone)
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo(LOCAL_TIMEZONE)
+    except (ImportError, KeyError):
+        try:
+            import pytz
+            return pytz.timezone(LOCAL_TIMEZONE)
+        except (ImportError, KeyError) as exc:
+            logger.warning(
+                "Impossible de charger le fuseau %s (%s) — fallback UTC",
+                LOCAL_TIMEZONE,
+                exc,
+            )
+            from datetime import timezone
+            return timezone.utc
+
+
 def paris_time_to_utc(hhmm: str) -> str:
     """
     Convertit une heure de Paris (HH:MM) en heure UTC (HH:MM).
@@ -125,13 +149,32 @@ def paris_time_to_utc(hhmm: str) -> str:
         naive = now.replace(hour=int(hour_str), minute=int(minute_str), second=0, microsecond=0)
         utc_dt = naive.astimezone(timezone.utc)
         return utc_dt.strftime("%H:%M")
-    except (ValueError, TypeError, ImportError) as exc:
-        # Fallback : retourne l'heure inchangée (considérée déjà UTC)
-        logger.warning(
-            "Impossible de convertir %s Paris → UTC (%s). Heure utilisée telle quelle.",
-            hhmm, exc,
-        )
-        return hhmm
+    except (ValueError, TypeError, ImportError, KeyError) as exc:
+        # Fallback : if zoneinfo est indisponible (ex: Windows sans tzdata),
+        # on utilise pytz pour une conversion fiable.
+        try:
+            from datetime import datetime, timezone
+            import pytz
+
+            hour_str, minute_str = hhmm.strip().split(":")
+            paris_tz = pytz.timezone(LOCAL_TIMEZONE)
+            now_paris = datetime.now(paris_tz)
+            naive_local = now_paris.replace(
+                hour=int(hour_str),
+                minute=int(minute_str),
+                second=0,
+                microsecond=0,
+                tzinfo=None,
+            )
+            local_aware = paris_tz.localize(naive_local, is_dst=None)
+            utc_dt = local_aware.astimezone(timezone.utc)
+            return utc_dt.strftime("%H:%M")
+        except (ValueError, TypeError, ImportError) as fallback_exc:
+            logger.warning(
+                "Impossible de convertir %s Paris → UTC (%s). Heure utilisée telle quelle.",
+                hhmm, fallback_exc,
+            )
+            return hhmm
 
 
 def utc_time_to_paris(hhmm: str) -> str:
