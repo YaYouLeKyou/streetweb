@@ -186,7 +186,7 @@ def generate_proposal() -> Optional[dict]:
         article = articles[0]
 
         # 3. Génération du texte par l'IA
-            breaking_text = ai_generator.generate_post(
+        breaking_text = ai_generator.generate_post(
             title=article.title,
             url=article.url,
             source=article.source,
