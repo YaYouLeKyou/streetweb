@@ -38,6 +38,13 @@ _CACHE_TTL = 120
 # Pool d'images de fallback pour Instagram (culture urbaine / street)
 _FALLBACK_IMAGES = [
     "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1524293233570-2ec0e8c2d177?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1506157786151-b8491531f063?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=1080&h=1080&fit=crop",
+    "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1080&h=1080&fit=crop",
 ]
 
 
@@ -73,17 +80,11 @@ def refresh_threads_token(current_token: str) -> str:
 def _generate_pollinations_image(prompt: str) -> str:
     """
     Génère une image via Pollinations.ai à partir d'un prompt texte.
-    Retourne l'URL de l'image générée.
+    Retourne l'URL de l'image générée (endpoint image directe).
     """
     try:
-        base_url = "https://pollinations.ai/p"
-        params = {
-            "width": 1080,
-            "height": 1080,
-            "model": "flux",
-            "prompt": prompt,
-        }
-        image_url = f"{base_url}/{requests.utils.quote(prompt)}?width=1080&height=1080&model=flux"
+        encoded_prompt = requests.utils.quote(prompt)
+        image_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1080&height=1080&model=flux&nologo=true"
         logger.info("Image générée via Pollinations : %s", image_url)
         return image_url
     except Exception as exc:  # noqa: BLE001
@@ -97,7 +98,7 @@ def get_valid_instagram_image(caption: str, user_image_url: str = None, title: s
 
     1. Si une URL d'image valide est fournie (ex: image de l'article RSS), elle est utilisée.
     2. Sinon, une image est générée via Pollinations.ai en fonction du titre/texte.
-    3. En dernier recours, une image de fallback générique est utilisée.
+    3. Si la génération échoue, une image de fallback thématique est utilisée.
     """
     if user_image_url and user_image_url.startswith("http"):
         try:
@@ -115,11 +116,16 @@ def get_valid_instagram_image(caption: str, user_image_url: str = None, title: s
         prompt = f"Streetweb faits divers culture urbaine, {prompt}, photo realiste, journalisme urbain"
         generated_url = _generate_pollinations_image(prompt)
         if generated_url:
-            logger.info("Utilisation de l'image générée : %s", generated_url)
-            return generated_url
+            try:
+                img_response = requests.head(generated_url, timeout=15, allow_redirects=True)
+                if img_response.status_code == 200 and img_response.headers.get("content-type", "").startswith("image/"):
+                    logger.info("Utilisation de l'image générée Pollinations : %s", generated_url)
+                    return generated_url
+            except requests.RequestException:
+                logger.warning("L'image Pollinations générée n'est pas directement accessible. Fallback thématique.")
 
-    fallback_image = _FALLBACK_IMAGES[0]
-    logger.info("Utilisation de l'image de fallback générique : %s", fallback_image)
+    fallback_image = random.choice(_FALLBACK_IMAGES)
+    logger.info("Utilisation de l'image de fallback thématique : %s", fallback_image)
     return fallback_image
 
 
