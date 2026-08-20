@@ -68,6 +68,22 @@ def _extract_entry_image(entry) -> Optional[str]:
         if isinstance(url, str) and url.startswith("http"):
             return url
 
+    # Cherche des images dans le HTML du résumé ou du contenu
+    html = ""
+    if hasattr(entry, "summary"):
+        html += entry.summary or ""
+    if hasattr(entry, "content"):
+        for content in entry.content:
+            if isinstance(content, dict):
+                html += content.get("value", "") or ""
+
+    if html:
+        import re
+        img_matches = re.findall(r'https?://[^\s"\'<>]+\.(?:jpg|jpeg|png|webp)', html, re.IGNORECASE)
+        for img_url in img_matches:
+            if img_url.startswith("http"):
+                return img_url
+
     return None
 
 
