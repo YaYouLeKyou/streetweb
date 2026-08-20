@@ -64,10 +64,11 @@ def _clean_generated_post(raw: str) -> str:
 def _call_llm(messages: list, max_tokens: int = 300) -> Optional[str]:
     """
     Appel générique à l'API LLM avec délai anti-rate-limit.
-    Essaie d'abord le LLM principal (Gemini), puis les fallbacks (Groq, OpenRouter).
+    Essaie d'abord Gemini, puis Groq. Si les deux sont indisponibles,
+    retourne None et le mode dégradé sera utilisé.
     """
-    if not config.LLM_API_KEY:
-        logger.error("LLM_API_KEY manquante dans l'environnement")
+    if not config.LLM_API_KEY and not config.GROQ_API_KEY:
+        logger.warning("Aucun fournisseur LLM configuré — mode dégradé sera utilisé")
         return None
 
     providers = []
@@ -88,19 +89,6 @@ def _call_llm(messages: list, max_tokens: int = 300) -> Optional[str]:
             "model": config.GROQ_MODEL,
         })
 
-    if config.OPENROUTER_API_KEY:
-        providers.append({
-            "name": "OpenRouter",
-            "key": config.OPENROUTER_API_KEY,
-            "base_url": config.OPENROUTER_BASE_URL,
-            "model": config.OPENROUTER_MODEL,
-        })
-
-    if not providers:
-        logger.error("Aucun fournisseur LLM configuré")
-        return None
-
-    last_error = None
     for provider in providers:
         try:
             logger.info("Tentative LLM : %s (%s)...", provider["name"], provider["model"])
@@ -115,10 +103,23 @@ def _call_llm(messages: list, max_tokens: int = 300) -> Optional[str]:
             return response.choices[0].message.content or ""
         except Exception as exc:  # noqa: BLE001
             logger.warning("Échec %s : %s", provider["name"], exc)
-            last_error = exc
 
-    logger.error("Tous les fournisseurs LLM ont échoué")
+    logger.warning("Tous les fournisseurs LLM ont échoué — mode dégradé sera utilisé")
     return None
+
+
+def _fallback_post(title: str, url: str, max_length: int = HARD_LIMIT) -> str:
+    """
+    Mode dégradé : construit un post simple sans IA.
+    Utilisé quand tous les providers LLM sont indisponibles.
+    """
+    post = f"{title}\n{url}"
+    if len(post) > max_length:
+        post = post[: max_length - 3].rstrip() + "..."
+    hashtag = " #FaitsDivers"
+    if len(post) + len(hashtag) <= max_length:
+        post = f"{post}{hashtag}"
+    return post.strip()
 
 
 def generate_tweet(title: str, url: str, source: str, summary: str = "") -> Optional[str]:
@@ -147,7 +148,8 @@ def generate_tweet(title: str, url: str, source: str, summary: str = "") -> Opti
         max_tokens=300,
     )
     if not raw_post:
-        return None
+        logger.warning("Mode dégradé activé pour generate_tweet : publication du lien seulement")
+        return _fallback_post(title, url)
 
     time.sleep(config.AI_GENERATION_DELAY)
 
@@ -201,7 +203,8 @@ def generate_long_post(title: str, url: str, source: str, summary: str = "") -> 
         max_tokens=800,
     )
     if not raw_post:
-        return None
+        logger.warning("Mode dégradé activé pour generate_long_post : publication du lien seulement")
+        return _fallback_post(title, url)
 
     time.sleep(config.AI_GENERATION_DELAY)
 
@@ -237,7 +240,7 @@ def generate_french_title(title: str, source: str, summary: str = "", max_attemp
     :param source: Nom de la source
     :param summary: Résumé de l'article
     :param max_attempts: Nombre maximum de tentatives
-    :return: Titre français ou None si échec
+    :return: Titre français ou titre original si échec
     """
     prompt = config.AI_TITLE_PROMPT_TEMPLATE.format(
         title=title,
@@ -263,5 +266,5 @@ def generate_french_title(title: str, source: str, summary: str = "", max_attemp
             logger.info("Titre français généré : %s", french_title)
             return french_title
 
-    logger.warning("Échec de la génération du titre français après %d tentatives", max_attempts)
-    return None
+    logger.warning("Échec de la génération du titre français après %d tentatives — titre original conservé", max_attempts)
+    return title

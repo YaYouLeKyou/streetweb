@@ -35,13 +35,6 @@ GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "groq/compound-mini")
 
 # ─────────────────────────────────────────────────────────────
-# Fallback LLM — OpenRouter (si Gemini et Groq sont indisponibles)
-# ─────────────────────────────────────────────────────────────
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.0-flash-exp:free")
-
-# ─────────────────────────────────────────────────────────────
 # API Facebook / Meta (Graph API) — Facebook + Instagram
 # ─────────────────────────────────────────────────────────────
 FB_PAGE_ACCESS_TOKEN = os.getenv("FB_PAGE_ACCESS_TOKEN", os.getenv("META_ACCESS_TOKEN", ""))
