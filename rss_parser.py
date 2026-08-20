@@ -84,7 +84,48 @@ def _extract_entry_image(entry) -> Optional[str]:
             if img_url.startswith("http"):
                 return img_url
 
+    # Fallback : télécharge la page de l'article et cherche og:image
+    article_url = entry.get("link") if hasattr(entry, "get") else getattr(entry, "link", None)
+    if article_url and article_url.startswith("http"):
+        return _fetch_article_image(article_url)
+
     return None
+
+
+def _fetch_article_image(article_url: str) -> Optional[str]:
+    """
+    Télécharge la page de l'article et extrait l'image og:image
+    ou la première image disponible dans le HTML.
+    """
+    try:
+        response = requests.get(article_url, timeout=15, headers={"User-Agent": _FEED_USER_AGENT})
+        if response.status_code != 200:
+            return None
+
+        html = response.text
+
+        # 1. Cherche d'abord og:image
+        import re
+        og_match = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+        if not og_match:
+            og_match = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']', html, re.IGNORECASE)
+
+        if og_match:
+            img_url = og_match.group(1)
+            if img_url.startswith("http"):
+                return img_url
+
+        # 2. Cherche la première image dans le HTML
+        img_matches = re.findall(r'<img[^>]+src=["\']([^"\']+)["\']', html, re.IGNORECASE)
+        for img_url in img_matches:
+            if img_url.startswith("http"):
+                return img_url
+
+        return None
+    except requests.RequestException:
+        return None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _parse_date(published_parsed: tuple) -> Optional[datetime]:
