@@ -64,43 +64,61 @@ def _clean_generated_post(raw: str) -> str:
 def _call_llm(messages: list, max_tokens: int = 300) -> Optional[str]:
     """
     Appel générique à l'API LLM avec délai anti-rate-limit.
-    Essaie d'abord le LLM principal (Gemini), puis le fallback (Groq).
+    Essaie d'abord le LLM principal (Gemini), puis les fallbacks (Groq, OpenRouter).
     """
     if not config.LLM_API_KEY:
         logger.error("LLM_API_KEY manquante dans l'environnement")
         return None
 
-    # 1. Tentative avec le LLM principal
-    try:
-        client = OpenAI(api_key=config.LLM_API_KEY, base_url=config.LLM_BASE_URL)
-        response = client.chat.completions.create(
-            model=config.LLM_MODEL,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=max_tokens,
-        )
-        return response.choices[0].message.content or ""
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Erreur LLM principal (%s) : %s", config.LLM_MODEL, exc)
+    providers = []
 
-    # 2. Fallback vers Groq si configuré
-    if not config.GROQ_API_KEY:
-        logger.error("LLM principal indisponible et GROQ_API_KEY manquant")
+    if config.LLM_API_KEY:
+        providers.append({
+            "name": "Gemini",
+            "key": config.LLM_API_KEY,
+            "base_url": config.LLM_BASE_URL,
+            "model": config.LLM_MODEL,
+        })
+
+    if config.GROQ_API_KEY:
+        providers.append({
+            "name": "Groq",
+            "key": config.GROQ_API_KEY,
+            "base_url": config.GROQ_BASE_URL,
+            "model": config.GROQ_MODEL,
+        })
+
+    if config.OPENROUTER_API_KEY:
+        providers.append({
+            "name": "OpenRouter",
+            "key": config.OPENROUTER_API_KEY,
+            "base_url": config.OPENROUTER_BASE_URL,
+            "model": config.OPENROUTER_MODEL,
+        })
+
+    if not providers:
+        logger.error("Aucun fournisseur LLM configuré")
         return None
 
-    try:
-        logger.info("Bascule vers le fallback Groq (%s)...", config.GROQ_MODEL)
-        client = OpenAI(api_key=config.GROQ_API_KEY, base_url=config.GROQ_BASE_URL)
-        response = client.chat.completions.create(
-            model=config.GROQ_MODEL,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=max_tokens,
-        )
-        return response.choices[0].message.content or ""
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Erreur fallback Groq (%s) : %s", config.GROQ_MODEL, exc)
-        return None
+    last_error = None
+    for provider in providers:
+        try:
+            logger.info("Tentative LLM : %s (%s)...", provider["name"], provider["model"])
+            client = OpenAI(api_key=provider["key"], base_url=provider["base_url"])
+            response = client.chat.completions.create(
+                model=provider["model"],
+                messages=messages,
+                temperature=0.7,
+                max_tokens=max_tokens,
+            )
+            logger.info("Succès avec %s", provider["name"])
+            return response.choices[0].message.content or ""
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Échec %s : %s", provider["name"], exc)
+            last_error = exc
+
+    logger.error("Tous les fournisseurs LLM ont échoué")
+    return None
 
 
 def generate_tweet(title: str, url: str, source: str, summary: str = "") -> Optional[str]:
