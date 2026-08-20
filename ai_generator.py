@@ -229,7 +229,7 @@ def generate_long_post(title: str, url: str, source: str, summary: str = "") -> 
     return post
 
 
-def generate_french_title(title: str, source: str, summary: str = "", max_attempts: int = 2) -> Optional[str]:
+def generate_french_title(title: str, source: str, summary: str = "", max_attempts: int = 1) -> Optional[str]:
     """
     Génère un titre français à partir d'un article, avec retry automatique.
 

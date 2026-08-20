@@ -18,8 +18,8 @@ import ai_generator
 
 logger = logging.getLogger(__name__)
 
-# Nombre de propositions à générer (1 principale + 2 secondaires)
-NUM_PROPOSALS = 3
+# Nombre de propositions à générer (1 principale + 1 secondaire)
+NUM_PROPOSALS = 2
 
 # Verrou pour empêcher l'exécution concurrente de generate_breaking_news().
 # Sans cela, un appel via /api/refresh peut se superposer à un job planifié,
