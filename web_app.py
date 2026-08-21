@@ -1,12 +1,11 @@
 from flask import Flask, render_template, jsonify
-session = Flask(__name__)
-app = session
-
 import news_service
-import logger
-
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Union
+
+app = Flask(__name__)
+logger = logging.getLogger(__name__)
 
 def _format_date(date_val):
     if not date_val:
@@ -37,7 +36,9 @@ def index():
         latest = news_service.get_latest_news()
         history = news_service.get_all_news(limit=20)
     except Exception as e:
-        pass
+        logger.error("Erreur lors de la récupération des news sur la page d'accueil : %s", e)
+        latest = None
+        history = []
     
     if latest and isinstance(latest, dict):
         latest["published_at_display"] = _extract_and_format_date(latest)
