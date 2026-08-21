@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Union
-from timedelta import timedelta
 
 @ app.route("/")
 def index():
