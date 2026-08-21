@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify
 import news_service
+import database
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Union
@@ -39,15 +40,22 @@ def index():
         logger.error("Erreur lors de la récupération des news sur la page d'accueil : %s", e)
         latest = None
         history = []
-    
+
+    posts = history if history else []
     if latest and isinstance(latest, dict):
-        latest["published_at_display"] = _extract_and_format_date(latest)
-    if history and isinstance(history, list):
-        for item in history:
-            if isinstance(item, dict):
-                item["published_at_display"] = _extract_and_format_date(item)
-    
-    return render_template("index.html")
+        posts = [latest] + history if history else [latest]
+
+    stats = {
+        "count": len(posts),
+        "total_posts": len(posts),
+        "published_today": len([p for p in posts if p.get("published_at")])
+    }
+
+    for item in posts:
+        if isinstance(item, dict):
+            item["published_at_display"] = _extract_and_format_date(item)
+
+    return render_template("index.html", news=latest, posts=posts, stats=stats)
 
 @app.route("/ping")
 def ping():
