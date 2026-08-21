@@ -183,11 +183,32 @@ def generate_news_job() -> bool:
     news = news_service.generate_breaking_news()
     if news:
         logger.info("Post genere : %s", news["title"][:60])
-        logger.info("Lancement publication Facebook + Instagram...")
-        publish_news_facebook(news)
-        publish_news_instagram(news)
-        logger.info("Cycle de publication termine.")
-        return True
+        logger.info("Envoi du post aux API Facebook/Instagram...")
+        # Publication Facebook
+        try:
+            facebook_success = publish_news_facebook(news)
+            logger.info("Publication Facebook %s", "réussie" if facebook_success else "échouée")
+            if not facebook_success:
+                logger.error("Échec de la publication Facebook")
+        except Exception as exc:
+            logger.error("Erreur lors de la publication Facebook : %s", exc)
+            return False
+
+        # Publication Instagram
+        try:
+            instagram_success = publish_news_instagram(news)
+            logger.info("Publication Instagram %s", "réussie" if instagram_success else "échouée")
+            if not instagram_success:
+                logger.error("Échec de la publication Instagram")
+        except Exception as exc:
+            logger.error("Erreur lors de la publication Instagram : %s", exc)
+            return False
+
+        if facebook_success and instagram_success:
+            logger.info("Cycle de publication terminé avec succès.")
+        else:
+            logger.warning("Cycle de publication terminé avec échec partiel.")
+        return facebook_success and instagram_success
     else:
         logger.warning("Echec de la generation du post")
         return False
@@ -323,10 +344,12 @@ def _catch_up_missed_posts(schedule_times: list) -> bool:
                 scheduled_time,
             )
             try:
-                generate_news_job()
-                _caught_up_times.add(scheduled_time)
-                caught_up += 1
-                logger.info("Rattrapage reussi — post manque a %s publie", scheduled_time)
+                if generate_news_job():
+                    _caught_up_times.add(scheduled_time)
+                    caught_up += 1
+                    logger.info("Rattrapage reussi — post manque a %s publie", scheduled_time)
+                else:
+                    logger.warning("Rattrapage ignoré — génération du post échouée pour %s", scheduled_time)
             except Exception as exc:  # noqa: BLE001
                 logger.error("Erreur lors du post de rattrapage : %s", exc)
                 _caught_up_times.add(scheduled_time)
