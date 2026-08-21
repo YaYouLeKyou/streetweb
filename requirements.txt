@@ -3,3 +3,4 @@ schedule
 python-dotenv
 feedparser
 openai>=0.28.0
+flask
