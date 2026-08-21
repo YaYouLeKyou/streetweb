@@ -11,6 +11,7 @@ Ce module assure :
 """
 
 import logging
+import os
 import threading
 import time
 from typing import Optional, Tuple, Dict, Any
@@ -26,6 +27,44 @@ logger = logging.getLogger(__name__)
 
 # Verrou pour éviter les publications concurrentes
 _publication_lock = threading.Lock()
+
+
+# ─────────────────────────────────────────────────────────────
+# Récupération flexible des identifiants Facebook / Instagram
+# Plusieurs alias de noms de variables d'environnement sont
+# acceptés afin qu'aucune publication ne soit bloquée si le nom
+# varie légèrement entre l'environnement local (.env) et Render.
+# ─────────────────────────────────────────────────────────────
+def _get_fb_token() -> str:
+    """Récupération flexible du token Facebook (alias supportés)."""
+    return (
+        config.FB_PAGE_ACCESS_TOKEN
+        or os.getenv("FB_PAGE_ACCESS_TOKEN")
+        or os.getenv("FACEBOOK_ACCESS_TOKEN")
+        or os.getenv("FB_ACCESS_TOKEN")
+        or os.getenv("META_ACCESS_TOKEN")
+        or ""
+    )
+
+
+def _get_fb_page_id() -> str:
+    """Récupération flexible de l'ID de Page (avec repli sur l'ID valide)."""
+    return (
+        config.FACEBOOK_PAGE_ID
+        or os.getenv("FACEBOOK_PAGE_ID")
+        or os.getenv("FB_PAGE_ID")
+        or "277418232940596"
+    )
+
+
+def _get_ig_account_id() -> str:
+    """Récupération flexible de l'ID de compte Instagram (alias supportés)."""
+    return (
+        config.INSTAGRAM_ACCOUNT_ID
+        or os.getenv("INSTAGRAM_ACCOUNT_ID")
+        or os.getenv("IG_USER_ID")
+        or ""
+    )
 
 class ImageManager:
     """Gestionnaire d'images résilient avec fallback automatique."""
@@ -158,9 +197,10 @@ class ResilientPublisher:
 
     @staticmethod
     def _validate_config() -> Tuple[bool, bool]:
-        """Valide la configuration Facebook/Instagram."""
-        fb_configured = bool(config.FB_PAGE_ACCESS_TOKEN and config.FACEBOOK_PAGE_ID)
-        ig_configured = bool(config.FB_PAGE_ACCESS_TOKEN and config.INSTAGRAM_ACCOUNT_ID)
+        """Valide la configuration Facebook/Instagram (avec alias d'environnement)."""
+        fb_token = _get_fb_token()
+        fb_configured = bool(fb_token and _get_fb_page_id())
+        ig_configured = bool(fb_token and _get_ig_account_id())
         return fb_configured, ig_configured
 
     @staticmethod
@@ -197,7 +237,7 @@ class ResilientPublisher:
     @staticmethod
     def _publish_to_instagram(news: Dict[str, Any], image_url: str) -> bool:
         """Publie sur Instagram avec gestion d'erreurs."""
-        if not config.INSTAGRAM_ACCOUNT_ID:
+        if not _get_ig_account_id():
             logger.warning("⚠️  Instagram non configuré (INSTAGRAM_ACCOUNT_ID manquant)")
             return False
 

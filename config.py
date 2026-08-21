@@ -36,10 +36,32 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "groq/compound-mini")
 
 # ─────────────────────────────────────────────────────────────
 # API Facebook / Meta (Graph API) — Facebook + Instagram
+# Récupération flexible : plusieurs alias de noms de variables
+# sont acceptés afin qu'aucun module ne reste bloqué si le nom
+# varie légèrement entre l'environnement local (.env) et Render.
 # ─────────────────────────────────────────────────────────────
-FB_PAGE_ACCESS_TOKEN = os.getenv("FB_PAGE_ACCESS_TOKEN", os.getenv("META_ACCESS_TOKEN", ""))
-FACEBOOK_PAGE_ID = os.getenv("FACEBOOK_PAGE_ID", "")
-INSTAGRAM_ACCOUNT_ID = os.getenv("INSTAGRAM_ACCOUNT_ID", "")
+
+# Récupération flexible du token Facebook
+FB_PAGE_ACCESS_TOKEN = (
+    os.getenv("FB_PAGE_ACCESS_TOKEN")
+    or os.getenv("FACEBOOK_ACCESS_TOKEN")
+    or os.getenv("FB_ACCESS_TOKEN")
+    or os.getenv("META_ACCESS_TOKEN")
+)
+
+# Récupération flexible de l'ID de Page (avec repli sur l'ID valide)
+FACEBOOK_PAGE_ID = (
+    os.getenv("FACEBOOK_PAGE_ID")
+    or os.getenv("FB_PAGE_ID")
+    or "277418232940596"
+)
+
+# Récupération flexible d'Instagram
+INSTAGRAM_ACCOUNT_ID = (
+    os.getenv("INSTAGRAM_ACCOUNT_ID")
+    or os.getenv("IG_USER_ID")
+    or ""
+)
 
 # ── Renouvellement automatique des tokens ────────────────────
 # Identifiants de l'application Facebook (nécessaires pour fb_exchange_token)
