@@ -93,11 +93,19 @@ def _call_llm(messages: list, max_tokens: int = 300) -> Optional[str]:
         try:
             logger.info("Tentative LLM : %s (%s)...", provider["name"], provider["model"])
             client = OpenAI(api_key=provider["key"], base_url=provider["base_url"])
+
+            # Configuration spécifique pour forcer le format JSON
+            extra_params = {}
+            if "gemini" in provider["model"].lower() or "json" in messages[1]["content"]:
+                # Pour Gemini et les prompts JSON, forcer le format JSON structuré
+                extra_params["response_format"] = {"type": "json_object"}
+
             response = client.chat.completions.create(
                 model=provider["model"],
                 messages=messages,
                 temperature=0.7,
                 max_tokens=max_tokens,
+                **extra_params
             )
             logger.info("Succès avec %s", provider["name"])
             return response.choices[0].message.content or ""
@@ -319,8 +327,10 @@ def generate_complete_post(title: str, url: str, source: str, summary: str = "")
 
     try:
         import json
+        # Nettoyer la réponse pour retirer les blocs Markdown
+        clean_response = raw_response.replace("```json", "").replace("```", "").strip()
         # Essaye de parser le JSON directement
-        result = json.loads(raw_response)
+        result = json.loads(clean_response)
         if "title" in result and "body" in result:
             logger.info("Post complet généré en un seul appel LLM")
             return result

@@ -155,6 +155,9 @@ def generate_breaking_news(force: bool = False) -> Optional[dict]:
             len(news["secondary_proposals"]),
         )
 
+        # Log explicite avant la publication
+        logger.info("Contenu généré avec succès : %s. Lancement de la publication...", news["title"][:60])
+
         # 9. Publication automatique sur Facebook et Instagram
         try:
             import main
