@@ -29,7 +29,6 @@ app = Flask(__name__)
 # Fichier .env pour persistance des réglages modifiés via le dashboard
 ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 
-
 def _update_env_var(key: str, value: str) -> bool:
     """Met à jour une variable dans le fichier .env (persistance)."""
     try:
@@ -64,7 +63,6 @@ def _update_env_var(key: str, value: str) -> bool:
 # 0 = désactivé (publication uniquement aux heures planifiées)
 AVAILABLE_INTERVALS = [0, 2, 4, 6, 8, 12, 24, 48]
 
-
 def _format_date(iso_str: str) -> str:
     """Convertit une date ISO (UTC) en format lisible en heure de Paris."""
     if not iso_str:
@@ -78,8 +76,7 @@ def _format_date(iso_str: str) -> str:
     except (ValueError, TypeError):
         return iso_str
 
-
-@app.route("/")
+@ app.route("/")
 def index():
     """Page principale : affiche le dernier post + historique."""
     latest = news_service.get_latest_news()
@@ -117,29 +114,22 @@ def index():
         max_history_size=config.MAX_HISTORY_SIZE,
     )
 
-
-@app.route("/ping")
+@ app.route("/ping")
 def ping():
     """
     Endpoint de réveil — utilisé par un cron externe (cron-job.org, UptimeRobot)
     pour réveiller le worker Render (plan gratuit) et exécuter les posts planifiés.
-
-    Exécute schedule.run_pending() et le rattrapage des posts manqués,
-    puis retourne "pong".
     """
     try:
         import schedule as schedule_module
-        import main as main_module
 
         schedule_module.run_pending()
-        main_module._catch_up_missed_posts(config.SCHEDULE_TIMES)
     except Exception as exc:  # noqa: BLE001
         logger.error("Erreur lors du traitement /ping : %s", exc)
 
     return "pong", 200
 
-
-@app.route("/api/latest")
+@ app.route("/api/latest")
 def api_latest():
     """API JSON : dernier post."""
     latest = news_service.get_latest_news()
@@ -147,20 +137,15 @@ def api_latest():
         return jsonify({"error": "Aucun post disponible"}), 404
     return jsonify(latest)
 
-
-@app.route("/api/history")
+@ app.route("/api/history")
 def api_history():
     """API JSON : historique des posts."""
     history = news_service.get_all_news(limit=50)
     return jsonify(history)
 
-
-@app.route("/api/refresh", methods=["POST"])
+@ app.route("/api/refresh", methods=["POST"])
 def api_refresh():
-    """
-    API JSON : force la génération d'un nouveau post.
-    Filtre les articles déjà traités pour toujours renvoyer du contenu neuf.
-    """
+    """API JSON : force la génération d'un nouveau post."""
     news = news_service.generate_breaking_news(force=True)
     if not news:
         latest = news_service.get_latest_news()
@@ -170,7 +155,7 @@ def api_refresh():
                 "error": "Aucun nouvel article disponible.",
                 "message": "Tous les articles RSS ont déjà été publiés. "
                            "Patientez jusqu'à de nouveaux articles, ou "
-                           "effacez l'historique pour tout republier.",
+                            "effacez l'historique pour tout republier.",
                 "latest_title": latest["title"][:50],
             }), 409
         return jsonify({
@@ -179,13 +164,9 @@ def api_refresh():
         }), 404
     return jsonify(news)
 
-
-@app.route("/api/refresh-proposal")
+@ app.route("/api/refresh-proposal")
 def api_refresh_proposal():
-    """
-    API JSON : génère une seule proposition secondaire (article non traité).
-    Utilisé par le bouton 🔄 des cartes "Autres propositions".
-    """
+    """API JSON : génère une seule proposition secondaire (article non traité)."""
     proposal = news_service.generate_proposal()
     if not proposal:
         latest = news_service.get_latest_news()
@@ -195,7 +176,7 @@ def api_refresh_proposal():
                 "error": "Aucun nouvel article disponible.",
                 "message": "Tous les articles RSS ont déjà été publiés. "
                            "Patientez jusqu'à de nouveaux articles, ou "
-                           "effacez l'historique pour tout republier.",
+                            "effacez l'historique pour tout republier.",
                 "latest_title": latest["title"][:50],
             }), 409
         return jsonify({
@@ -204,8 +185,7 @@ def api_refresh_proposal():
         }), 404
     return jsonify(proposal)
 
-
-@app.route("/api/clear-history", methods=["POST"])
+@ app.route("/api/clear-history", methods=["POST"])
 def api_clear_history():
     """API : vide l'historique des posts et le cache anti-doublons."""
     removed_news = database.clear_breaking_news_history()
@@ -222,8 +202,7 @@ def api_clear_history():
         "removed_processed": removed_processed,
     })
 
-
-@app.route("/api/interval", methods=["POST"])
+@ app.route("/api/interval", methods=["POST"])
 def api_set_interval():
     """API : change la fréquence de mise à jour (en heures). 0 = désactivé."""
     data = request.get_json(silent=True) or {}
@@ -247,12 +226,9 @@ def api_set_interval():
     return jsonify({"success": True, "interval": interval, "label": "Désactivé" if interval == 0 else f"Toutes les {interval} heures"})
 
 
-@app.route("/api/schedule", methods=["POST"])
+@ app.route("/api/schedule", methods=["POST"])
 def api_set_schedule():
-    """
-    API : change les heures de publication planifiées (format HH:MM, heure de Paris).
-    Re-planifie immédiatement les publications.
-    """
+    """API : change les heures de publication planifiées (format HH:MM, heure de Paris)."""
     data = request.get_json(silent=True) or {}
     raw_times = data.get("times", [])
 
@@ -299,13 +275,9 @@ def _build_long_post_message(news: dict) -> str:
     return message.strip()
 
 
-@app.route("/api/post-now", methods=["POST"])
+@ app.route("/api/post-now", methods=["POST"])
 def api_post_now():
-    """
-    API : génère un nouveau post et le publie sur les
-    plateformes sélectionnées : facebook, instagram.
-    Retourne la simulation visuelle et le statut de publication.
-    """
+    """API : génère un nouveau post et le publie sur les plateformes sélectionnées : facebook, instagram."""
     data = request.get_json(silent=True) or {}
     raw_network = data.get("network", "facebook")
     if isinstance(raw_network, str):
@@ -380,6 +352,8 @@ def api_post_now():
                     if not facebook_published:
                         facebook_error = "Échec de la publication Facebook — voir les logs serveur"
                         progress[-1]["error"] = facebook_error
+                    else:
+                        facebook_error = None
                 else:
                     facebook_error = (
                         "Token Facebook/Instagram expiré ou invalide. "
@@ -410,8 +384,6 @@ def api_post_now():
                 progress[-1]["error"] = "Mode dry-run activé"
             elif not config.FB_PAGE_ACCESS_TOKEN or not config.FACEBOOK_PAGE_ID:
                 progress[-1]["error"] = "Facebook non configuré"
-    else:
-        progress.append({"step": "facebook", "message": "Facebook non sélectionné", "done": True, "skipped": True})
 
     result["facebook_published"] = facebook_published
     result["facebook_error"] = facebook_error
@@ -441,23 +413,8 @@ def api_post_now():
                     if not instagram_published:
                         instagram_error = "Échec de la publication Instagram — voir les logs serveur"
                         progress[-1]["error"] = instagram_error
-                else:
-                    instagram_error = (
-                        "Token Instagram expiré ou invalide. "
-                        "Générez un nouveau Page Access Token sur "
-                        "https://developers.facebook.com/tools/access-token/ "
-                        "avec les permissions pages_read_engagement et pages_manage_posts, "
-                        "puis redémarrez l'application."
-                    )
-                    progress[-1]["done"] = True
-                    progress[-1]["success"] = False
-                    progress[-1]["error"] = instagram_error
-                    # Notification email en cas de token expiré
-                    email_notifier.send_token_expired_alert(
-                        platform="Instagram",
-                        token_name="FB_PAGE_ACCESS_TOKEN",
-                        error_detail=instagram_error,
-                    )
+                    else:
+                        instagram_error = None
             except Exception as exc:  # noqa: BLE001
                 logger.error("Erreur lors de la publication Instagram : %s", exc)
                 instagram_error = str(exc)
@@ -471,8 +428,6 @@ def api_post_now():
                 progress[-1]["error"] = "Mode dry-run activé"
             elif not config.INSTAGRAM_ACCOUNT_ID:
                 progress[-1]["error"] = "Instagram non configuré"
-    else:
-        progress.append({"step": "instagram", "message": "Instagram non sélectionné", "done": True, "skipped": True})
 
     result["instagram_published"] = instagram_published
     result["instagram_error"] = instagram_error
@@ -491,13 +446,9 @@ def api_post_now():
     return jsonify(result)
 
 
-@app.route("/api/force-publish", methods=["POST"])
+@ app.route("/api/force-publish", methods=["POST"])
 def api_force_publish():
-    """
-    API : publie IMMEDIATEMENT le dernier post généré sur Facebook et/ou Instagram.
-    Ne génère PAS de nouveau contenu : prend le dernier post en base.
-    Permet de valider la publication Meta sans attendre le scheduler ni les RSS.
-    """
+    """API : publie IMMEDIATEMENT le dernier post généré sur Facebook et/ou Instagram."""
     data = request.get_json(silent=True) or {}
     raw_network = data.get("network", "facebook,instagram")
     if isinstance(raw_network, str):
@@ -508,24 +459,6 @@ def api_force_publish():
     valid_networks = [n for n in networks if n in ("facebook", "instagram")]
     if not valid_networks:
         valid_networks = ["facebook", "instagram"]
-
-    post_facebook = "facebook" in valid_networks
-    post_instagram = "instagram" in valid_networks
-
-    latest = news_service.get_latest_news()
-    if not latest:
-        return jsonify({
-            "error": "Aucun post disponible en base.",
-            "detail": "Générez d'abord un post via /api/refresh ou attendez la prochaine génération RSS.",
-        }), 404
-
-    progress = []
-    result = {
-        "success": True,
-        "network": ",".join(valid_networks),
-        "news_id": latest.get("id"),
-        "progress": progress,
-    }
 
     facebook_published = False
     facebook_error = None
@@ -553,26 +486,17 @@ def api_force_publish():
                     if not facebook_published:
                         facebook_error = "Echec de la publication Facebook — voir les logs serveur"
                         progress[-1]["error"] = facebook_error
-                else:
-                    facebook_error = "Token Facebook invalide ou expire"
-                    progress[-1]["done"] = True
-                    progress[-1]["success"] = False
-                    progress[-1]["error"] = facebook_error
+                    else:
+                        facebook_error = None
             except Exception as exc:  # noqa: BLE001
                 logger.error("Erreur force-publish Facebook : %s", exc)
                 facebook_error = str(exc)
                 progress[-1]["done"] = True
                 progress[-1]["success"] = False
                 progress[-1]["error"] = facebook_error
+
         else:
-            progress[-1]["done"] = True
-            progress[-1]["success"] = False
-            if config.DRY_RUN:
-                progress[-1]["error"] = "Mode dry-run active"
-            else:
-                progress[-1]["error"] = "Facebook non configure"
-    else:
-        progress.append({"step": "facebook", "message": "Facebook non selectionne", "done": True, "skipped": True})
+            progress.append({"step": "facebook", "message": "Facebook non selectionne", "done": True, "skipped": True})
 
     result["facebook_published"] = facebook_published
     result["facebook_error"] = facebook_error
@@ -601,11 +525,8 @@ def api_force_publish():
                     if not instagram_published:
                         instagram_error = "Echec de la publication Instagram — voir les logs serveur"
                         progress[-1]["error"] = instagram_error
-                else:
-                    instagram_error = "Token Instagram invalide ou expire"
-                    progress[-1]["done"] = True
-                    progress[-1]["success"] = False
-                    progress[-1]["error"] = instagram_error
+                    else:
+                        instagram_error = None
             except Exception as exc:  # noqa: BLE001
                 logger.error("Erreur force-publish Instagram : %s", exc)
                 instagram_error = str(exc)
@@ -613,14 +534,7 @@ def api_force_publish():
                 progress[-1]["success"] = False
                 progress[-1]["error"] = instagram_error
         else:
-            progress[-1]["done"] = True
-            progress[-1]["success"] = False
-            if config.DRY_RUN:
-                progress[-1]["error"] = "Mode dry-run active"
-            else:
-                progress[-1]["error"] = "Instagram non configure"
-    else:
-        progress.append({"step": "instagram", "message": "Instagram non selectionne", "done": True, "skipped": True})
+            progress.append({"step": "instagram", "message": "Instagram non selectionne", "done": True, "skipped": True})
 
     result["instagram_published"] = instagram_published
     result["instagram_error"] = instagram_error
@@ -635,7 +549,7 @@ def api_force_publish():
     return jsonify(result)
 
 
-@app.route("/api/facebook/status")
+@ app.route("/api/facebook/status")
 def api_facebook_status():
     """API : vérifie si Facebook est configuré."""
     configured = bool(config.FB_PAGE_ACCESS_TOKEN and config.FACEBOOK_PAGE_ID)
@@ -644,13 +558,9 @@ def api_facebook_status():
         "dry_run": config.DRY_RUN,
     })
 
-
-@app.route("/api/facebook/connect", methods=["POST"])
+@ app.route("/api/facebook/connect", methods=["POST"])
 def api_facebook_connect():
-    """
-    API : vérifie la connexion Facebook en testant la configuration.
-    Retourne l'état de la connexion et les infos de la page.
-    """
+    """API : vérifie la connexion Facebook en testant la configuration."""
     if not config.FB_PAGE_ACCESS_TOKEN or not config.FACEBOOK_PAGE_ID:
         return jsonify({
             "success": False,
@@ -682,13 +592,9 @@ def api_facebook_connect():
             "error": f"Erreur lors de la connexion Facebook : {exc}",
         }), 500
 
-
-@app.route("/api/facebook/diagnostic")
+@ app.route("/api/facebook/diagnostic")
 def api_facebook_diagnostic():
-    """
-    API : diagnostic complet du token Facebook.
-    Vérifie la validité du token et les permissions via /debug_token.
-    """
+    """API : diagnostic complet du token Facebook."""
     if not config.FB_PAGE_ACCESS_TOKEN:
         return jsonify({
             "success": False,
@@ -711,12 +617,10 @@ def api_facebook_diagnostic():
         "dry_run": config.DRY_RUN,
     })
 
-
 def run_web_server(host: str = "0.0.0.0", port: int = 5000) -> None:
     """Lance le serveur web Flask."""
     logger.info("Serveur web demarre sur http://%s:%d", host, port)
     app.run(host=host, port=port, debug=False, use_reloader=False)
-
 
 if __name__ == "__main__":
     database.init_db()
