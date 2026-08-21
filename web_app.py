@@ -22,28 +22,30 @@ def index():
     # Autres variables (stats, intervals, etc.)
 
 
-def _format_date(iso_str: str) -> str:
-    """Convertit une date ISO (UTC) en format lisible en heure de Paris."""
-    if not iso_str:
+def _format_date(date_val):
+    """Convertit une date ISO, un timestamp ou un objet datetime en format lisible JJ/MM/AAAA HH:MM."""
+    if not date_val:
         return ""
     try:
-        dt = datetime.fromisoformat(iso_str)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        paris_dt = dt.astimezone(get_paris_tz())
-        return paris_dt.strftime("%d/%m/%Y à %H:%M")
-    except (ValueError, TypeError):
-        return iso_str
+        if isinstance(date_val, datetime):
+            return date_val.strftime("%d/%m/%Y %H:%M")
+
+        clean_str = str(date_val).replace("Z", "+00:00")
+        dt = datetime.fromisoformat(clean_str)
+        return dt.strftime("%d/%m/%Y %H:%M")
+    except Exception:
+        return str(date_val)
 
 def _extract_and_format_date(item):
-    """Extrait la date quelle que soit la clé utilisée dans le dictionnaire."""
+    """Extrait la date disponible et la formate proprement."""
     if not isinstance(item, dict):
         return ""
+
     raw_date = (
-        item.get("published_at") 
-        or item.get("publishedAt") 
-        or item.get("created_at") 
-        or item.get("date") 
+        item.get("published_at")
+        or item.get("publishedAt")
+        or item.get("created_at")
+        or item.get("date")
         or ""
     )
-    return _format_date(str(raw_date)) if raw_date else ""
+    return _format_date(raw_date) if raw_date else ""
