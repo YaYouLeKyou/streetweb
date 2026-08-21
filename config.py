@@ -58,13 +58,13 @@ TOKEN_RENEWAL_DAYS = int(os.getenv("TOKEN_RENEWAL_DAYS", "30"))
 DEFAULT_RSS_FEEDS = [
     # 🇫🇷 Francophone — Faits divers & Société
     "https://www.leparisien.fr/faits-divers/rss.xml",       # vérifié stable
+    "https://www.francetvinfo.fr/faits-divers.rss",         # vérifié stable
+    "https://www.20minutes.fr/feeds/rss-faits-divers.xml",  # vérifié stable
+    "https://www.lexpress.fr/rss/fait-divers.xml",          # faits divers
     # 🇫🇷 Culture urbaine — Rap, Street Art, Tendances
     "https://www.booska-p.com/feed/",                       # rap & culture
-    "https://www.rap2france.com/feed/",                     # rap fiable
-    "https://www.streetartnews.net/rss.aspx",               # street art
-    "https://www.hiphopfrance.com/rss.xml",                 # hip hop
-    "https://www.lexpress.fr/rss/fait-divers.xml",         # faits divers
-    "https://www.rtl.fr/rss/fait-divers.xml",              # radio news
+    "https://www.abcdrduson.com/feed/",                     # rap & culture urbaine
+    "https://www.konbini.com/fr/feed/",                     # culture & tendances
 ]
 
 # Timeout/retry RSS (raccourcis pour ne pas bloquer le worker)
