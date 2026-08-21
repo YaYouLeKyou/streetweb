@@ -70,14 +70,15 @@ def generate_breaking_news(force: bool = False) -> Optional[dict]:
         # 3. Génération des résumés par l'IA pour chaque article
         proposals = []
         for i, article in enumerate(best_articles):
-            breaking_text = ai_generator.generate_post(
+            # Utilisation de la nouvelle fonction optimisée pour condenser les appels LLM
+            complete_post = ai_generator.generate_complete_post(
                 title=article.title,
                 url=article.url,
                 source=article.source,
                 summary=article.summary,
             )
 
-            if not breaking_text:
+            if not complete_post:
                 logger.warning("Échec de la génération IA pour la proposition %d", i + 1)
                 # Marque l'article comme traité pour ne pas bloquer indéfiniment
                 database.mark_article_processed(
@@ -89,11 +90,12 @@ def generate_breaking_news(force: bool = False) -> Optional[dict]:
                 continue
 
             proposals.append({
-                "title": article.title,
+                "title": complete_post.get("title", article.title),
                 "url": article.url,
                 "source": article.source,
                 "summary": article.summary,
-                "breaking_text": breaking_text,
+                "breaking_text": complete_post.get("body", ""),
+                "long_text": complete_post.get("long_body", ""),
                 "image": article.image,
             })
 
@@ -152,6 +154,25 @@ def generate_breaking_news(force: bool = False) -> Optional[dict]:
             news["title"][:60],
             len(news["secondary_proposals"]),
         )
+
+        # 9. Publication automatique sur Facebook et Instagram
+        try:
+            import main
+            # Publication Facebook
+            facebook_success = main.publish_news_facebook(news)
+            logger.info("Publication Facebook %s", "réussie" if facebook_success else "échouée")
+
+            # Publication Instagram
+            instagram_success = main.publish_news_instagram(news)
+            logger.info("Publication Instagram %s", "réussie" if instagram_success else "échouée")
+
+            if facebook_success and instagram_success:
+                logger.info("Publication bi-plateforme terminée avec succès")
+            else:
+                logger.warning("Publication bi-plateforme terminée avec échec partiel")
+        except Exception as exc:
+            logger.error("Erreur lors de la publication automatique : %s", exc)
+
         return news
     finally:
         _breaking_news_lock.release()

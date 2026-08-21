@@ -268,3 +268,67 @@ def generate_french_title(title: str, source: str, summary: str = "", max_attemp
 
     logger.warning("Échec de la génération du titre français après %d tentatives — titre original conservé", max_attempts)
     return title
+
+def generate_complete_post(title: str, url: str, source: str, summary: str = "") -> Optional[dict]:
+    """
+    Génère un post complet avec titre et corps en UN SEUL appel LLM.
+    Optimisation pour éviter les appels multiples à Gemini.
+
+    :param title: Titre de l'article
+    :param url: Lien de l'article
+    :param source: Nom de la source
+    :param summary: Résumé de l'article
+    :return: dict avec 'title' et 'body', ou None si échec
+    """
+    prompt = f"""Génère un post complet en français avec les éléments suivants :
+
+    1. Un titre français accrocheur et optimisé pour les réseaux sociaux
+    2. Un texte de post court et percutant avec 3 hashtags pertinents
+    3. Un texte de post long et détaillé pour Facebook
+
+    Format de réponse requis (JSON valide) :
+    {{
+        "title": "Titre français accrocheur",
+        "body": "Texte court avec hashtags et lien",
+        "long_body": "Texte long détaillé avec lien"
+    }}
+
+    Article original :
+    Titre: {title}
+    Source: {source}
+    URL: {url}
+    Résumé: {summary or "Pas de résumé disponible."}"""
+
+    raw_response = _call_llm(
+        messages=[
+            {"role": "system", "content": config.AI_SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        max_tokens=800,
+    )
+
+    if not raw_response:
+        logger.warning("Mode dégradé activé pour generate_complete_post")
+        return {
+            "title": title,
+            "body": f"{title}\n{url} #FaitsDivers",
+            "long_body": f"{title}\n\n{summary or ''}\n\n{url} #FaitsDivers"
+        }
+
+    time.sleep(config.AI_GENERATION_DELAY)
+
+    try:
+        import json
+        # Essaye de parser le JSON directement
+        result = json.loads(raw_response)
+        if "title" in result and "body" in result:
+            logger.info("Post complet généré en un seul appel LLM")
+            return result
+    except (json.JSONDecodeError, KeyError):
+        # Si le parsing JSON échoue, utilise le mode dégradé
+        logger.warning("Réponse LLM non conforme au format JSON attendu")
+        return {
+            "title": title,
+            "body": f"{title}\n{url} #FaitsDivers",
+            "long_body": f"{title}\n\n{summary or ''}\n\n{url} #FaitsDivers"
+        }

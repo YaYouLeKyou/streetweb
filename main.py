@@ -387,13 +387,9 @@ def _generate_initial_news() -> None:
             logger.info("TEST_ON_STARTUP=true — exécution immédiate d'un cycle complet")
             generate_news_job()
         else:
-            # Génération immédiate d'un premier post (sans publication)
-            logger.info("Génération du premier post…")
-            news = news_service.generate_breaking_news()
-            if news:
-                logger.info("Post initial genere : %s", news["title"][:60])
-            else:
-                logger.warning("⚠️  Échec de la génération initiale")
+            # Génération immédiate d'un premier post (avec publication)
+            logger.info("Génération du premier post et publication...")
+            generate_news_job()
     except Exception as exc:  # noqa: BLE001
         logger.error("Erreur lors de la génération initiale : %s", exc)
 

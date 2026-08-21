@@ -398,7 +398,6 @@
         .btn-instagram:hover {
             box-shadow: 0 5px 20px rgba(225, 48, 108, 0.3);
         }
-        }
 
         .btn-all {
             background: linear-gradient(90deg, #00d2ff, #0099cc);
@@ -695,8 +694,7 @@
             gap: 8px;
         }
 
-        
-    </style>
+        </style>
 </head>
 <body data-dry-run="{{ 'true' if dry_run else 'false' }}">
     <div class="container">
@@ -807,7 +805,6 @@
             </div>
         </div>
 
-
         <div class="stats">
             <div class="stat-box">
                 <div class="value">{{ stats.count }}</div>
@@ -841,7 +838,7 @@
             <div class="actions">
                 <a href="{{ latest.url }}" target="_blank" class="btn">Lire l'article complet →</a>
                 <button onclick="refreshNews()" class="btn btn-secondary">🔄 Actualiser maintenant</button>
-                <button onclick="postNow("facebook")" class="btn btn-Post">⚡ Post Now</button>
+                <button onclick="postNow('facebook')" class="btn btn-Post">⚡ Post Now</button>
             </div>
             <div class="loading" id="loading">Génération de la nouvelle breaking news en cours…</div>
         </div>
@@ -901,35 +898,11 @@
         </footer>
     </div>
 
-    
-            </div>
-            <div class="Post-body" id="PostBody"></div>
-            <div class="Post-card-preview" id="PostCard">
-                <div class="card-title" id="PostCardTitle"></div>
-                <div class="card-source" id="PostCardSource"></div>
-            </div>
-            <div class="Post-footer">
-                <div class="Post-actions">
-                    <span>💬</span>
-                    <span>🔁</span>
-                    <span>❤️</span>
-                    <span>🔗</span>
-                </div>
-                <div class="Post-char-count" id="PostCharCount"></div>
-            </div>
-            <div class="Post-status" id="PostStatus"></div>
-            <div class="Post-modal-actions">
-                <button onclick="closePostModal()" class="btn btn-close">Annuler</button>
-                <button onclick="publishPost()" class="btn btn-publish" id="publishBtn">Publier le post</button>
-            </div>
-        </div>
-    </div>
-
     <div class="toast" id="toast"></div>
 
     <script>
         const DRY_RUN = document.body.dataset.dryRun === 'true';
-        let 
+        let currentPostData = null;
         let activeNetworks = new Set(["facebook", "instagram"]);
 
         function updateNetworkButtons() {
@@ -968,10 +941,15 @@
 
         // Post minute : publie immédiatement sur les plateformes sélectionnées
         async function postNow(network) {
-            const networks = getSelectedNetworks();
-            if (networks.length === 0) {
-                showToast('❌ Sélectionnez au moins une plateforme', true);
-                return;
+            let networksToPost;
+            if (network === 'all') {
+                networksToPost = getSelectedNetworks();
+                if (networksToPost.length === 0) {
+                    showToast('❌ Sélectionnez au moins une plateforme', true);
+                    return;
+                }
+            } else {
+                networksToPost = [network];
             }
 
             const loading = document.getElementById('loading');
@@ -980,8 +958,9 @@
                 const networkLabels = {
                     'facebook': '📘 Envoi du post Facebook…',
                     'instagram': '📸 Envoi du post Instagram…',
-                    };
-                const labels = networks.map(n => networkLabels[n] || n).join(', ');
+                    'all': '📤 Envoi du post sur toutes les plateformes…'
+                };
+                const labels = networksToPost.map(n => networkLabels[n] || n).join(', ');
                 loading.textContent = labels;
             }
 
@@ -989,7 +968,7 @@
                 const response = await fetch('/api/post-now', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ network: networks.join(',') })
+                    body: JSON.stringify({ network: networksToPost.join(',') })
                 });
                 const data = await response.json();
 
@@ -1015,8 +994,24 @@
                     }, 800);
                 }
 
-                currentPostData = data;
-                showPostPreview(data.Post_preview);
+                // Afficher un toast avec le résultat de la publication
+                const successMessages = [];
+                if (data.facebook_published) successMessages.push('📘 Facebook publié');
+                if (data.instagram_published) successMessages.push('📸 Instagram publié');
+
+                if (successMessages.length > 0) {
+                    showToast('✅ ' + successMessages.join(' + '), false);
+                } else {
+                    const errorMessages = [];
+                    if (data.facebook_error) errorMessages.push('Facebook: ' + data.facebook_error);
+                    if (data.instagram_error) errorMessages.push('Instagram: ' + data.instagram_error);
+                    showToast('⚠️ ' + (errorMessages.join(' | ') || 'Publication partielle'), true);
+                }
+
+                // Recharger la page pour afficher les nouvelles données
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
             } catch (error) {
                 if (loading) loading.style.display = 'none';
                 showToast('❌ ' + error.message, true);
@@ -1112,70 +1107,6 @@
                 showToast('✅ Heures de publication enregistrées : ' + data.times.join(' & ') + ' (heure de Paris)');
             } catch (error) {
                 showToast('❌ ' + error.message, true);
-            }
-        }
-
-        // Post minute : publie immédiatement sur la plateforme choisie
-        async function postNow(network) {
-            const loading = document.getElementById('loading');
-            if (loading) {
-                loading.style.display = 'block';
-                const networkLabels = {
-                    'facebook': '📘 Envoi du post Facebook…',
-                    'instagram': '📸 Envoi du post Instagram…',
-                    'all': '📤 Envoi du post sur toutes les plateformes…'
-                };
-                loading.textContent = networkLabels[network] || '⏳ Publication en cours…';
-            }
-
-            try {
-                const response = await fetch('/api/post-now', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ network: network })
-                });
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Erreur lors de la publication');
-                }
-
-                if (loading && data.progress) {
-                    const lastStep = data.progress[data.progress.length - 1];
-                    if (lastStep && lastStep.message) {
-                        loading.textContent = lastStep.message;
-                    }
-                    setTimeout(() => {
-                        if (loading) loading.style.display = 'none';
-                    }, 800);
-                } else if (loading) {
-                    setTimeout(() => {
-                        if (loading) loading.style.display = 'none';
-                    }, 800);
-                }
-
-                currentPostData = data;
-                showPostPreview(data.Post_preview);
-            } catch (error) {
-                if (loading) loading.style.display = 'none';
-                showToast('❌ ' + error.message, true);
-            }
-        }
-
-        async );
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Erreur lors de la connexion');
-                }
-
-                btn.textContent = '✅ Facebook connecté';
-                showToast('✅ ' + data.message);
-            } catch (error) {
-                btn.textContent = '🔗 Connecter Facebook';
-                showToast('❌ ' + error.message, true);
-            } finally {
-                btn.disabled = false;
             }
         }
 
@@ -1326,168 +1257,6 @@
             }
         }
 
-        async 
-
-            try {
-                const response = await fetch('/api/post-now', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ network: 'facebook' })
-                });
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Erreur lors de la publication');
-                }
-
-                if (loading) {
-                    setTimeout(() => {
-                        if (loading) loading.style.display = 'none';
-                    }, 800);
-                }
-
-                currentPostData = data;
-                showPostPreview(data.Post_preview);
-            } catch (error) {
-                if (loading) loading.style.display = 'none';
-                showToast('❌ ' + error.message, true);
-            }
-        }
-
-        async 
-
-            try {
-                const response = await fetch('/api/post-now', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ network: 'facebook' })
-                });
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Erreur lors de la génération du Post');
-                }
-
-                if (loading && data.progress) {
-                    const lastStep = data.progress[data.progress.length - 1];
-                    if (lastStep && lastStep.message) {
-                        loading.textContent = lastStep.message;
-                    }
-                    setTimeout(() => {
-                        if (loading) loading.style.display = 'none';
-                    }, 800);
-                } else if (loading) {
-                    setTimeout(() => {
-                        if (loading) loading.style.display = 'none';
-                    }, 800);
-                }
-
-                currentPostData = data;
-                showPostPreview(data.Post_preview);
-            } catch (error) {
-                if (loading) loading.style.display = 'none';
-                showToast('❌ ' + error.message, true);
-            }
-        }
-
-        
-            if (count > 270) {
-                charCount.classList.add('danger');
-            }
-
-            // Statut de publication
-            status.className = 'Post-status';
-            status.style.display = 'none';
-            if (currentPostData.dry_run) {
-                status.textContent = '🧪 Mode DRY-RUN : le Post ne sera PAS publié réellement sur Facebook.';
-                status.className = 'Post-status dry-run';
-                status.style.display = 'block';
-                publishBtn.textContent = 'Simuler la publication';
-            } else {
-                publishBtn.textContent = 'Publier le post';
-            }
-
-            modal.classList.add('active');
-        }
-
-        
-
-        async , 1500);
-                    return;
-                }
-
-                const data = currentPostData;
-                const networks = (data.network || "").split(",").filter(Boolean);
-
-                const parts = [];
-                if (networks.includes("Facebook")) {
-                    parts.push(data.published ? '🐦 Facebook envoyé' : '🐦 Facebook non envoyé');
-                }
-                if (networks.includes("facebook")) {
-                    if (data.facebook_published) {
-                        parts.push('📘 Facebook envoyé avec succès');
-                    } else if (data.facebook_error) {
-                        parts.push('📘 Facebook échec : ' + data.facebook_error);
-                    } else {
-                        parts.push('📘 Facebook non envoyé');
-                    }
-                }
-                if (networks.includes("instagram")) {
-                    if (data.instagram_published) {
-                        parts.push('📸 instagram envoyé');
-                    } else if (data.instagram_error) {
-                        parts.push('📸 instagram échec : ' + data.instagram_error);
-                    } else {
-                        parts.push('📸 instagram non envoyé');
-                    }
-                }
-                if (networks.includes("instagram")) {
-                    if (data.instagram_published) {
-                        parts.push('🔗 instagram envoyé');
-                    } else if (data.instagram_error) {
-                        parts.push('🔗 instagram échec : ' + data.instagram_error);
-                    } else {
-                        parts.push('🔗 instagram non envoyé');
-                    }
-                }
-
-                const anySuccess = networks.some(network => {
-                    if (network === 'Facebook') return data.published;
-                    if (network === 'facebook') return data.facebook_published;
-                    if (network === 'instagram') return data.instagram_published;
-                    if (network === 'instagram') return data.instagram_published;
-                    return false;
-                });
-
-                if (anySuccess) {
-                    status.textContent = '✅ Post envoyé : ' + parts.join(' · ');
-                    status.className = 'Post-status success';
-                    status.style.display = 'block';
-                    showToast('✅ ' + parts.join(' · '));
-                } else {
-                    status.textContent = '⚠️ Échec de l\'envoi : ' + parts.join(' · ');
-                    status.className = 'Post-status error';
-                    status.style.display = 'block';
-                    showToast('❌ Échec de la publication', true);
-                }
-            } catch (error) {
-                status.textContent = '❌ ' + error.message;
-                status.className = 'Post-status error';
-                status.style.display = 'block';
-                showToast('❌ ' + error.message, true);
-            } finally {
-                publishBtn.disabled = false;
-                publishBtn.textContent = 'Fermer';
-            }
-        }
-
-        // Fermer le modal en cliquant en dehors
-        document.getElementById('PostModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closePostModal();
-            }
-        });
-
         // Auto-refresh toutes les 2 minutes pour vérifier les nouvelles news
         setInterval(() => {
             fetch('/api/latest')
@@ -1505,5 +1274,3 @@
     </script>
 </body>
 </html>
-
-
