@@ -3,7 +3,7 @@
 import logging
 import threading
 from datetime import datetime, timezone
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 import config
 import database
@@ -13,13 +13,15 @@ import ai_generator
 logger = logging.getLogger(__name__)
 _breaking_news_lock = threading.Lock()
 
-def generate_news_job() -> Optional[Dict]:
+
+def generate_breaking_news() -> Optional[Dict]:
+    """Génère une breaking news à partir des derniers articles RSS."""
     logger.info("=== Génération d'une breaking news ===")
-    
+
     if not _breaking_news_lock.acquire(blocking=False):
         logger.warning("Génération déjà en cours - ignorez la requête non forcée")
         return None
-        
+
     try:
         articles = rss_parser.fetch_new_articles(max_items=config.MAX_ARTICLES_TO_PROCESS)
         if not articles:
@@ -54,9 +56,9 @@ def generate_news_job() -> Optional[Dict]:
         }
 
         logger.info("Génération terminée - sauvegarde en base")
-        
+
         database.save_breaking_news(news)
-        
+
         # Marque uniquement le post principal comme traité (pas de propositions secondaires inutiles)
         database.mark_article_processed(
             url=selected_article.url,
@@ -69,11 +71,12 @@ def generate_news_job() -> Optional[Dict]:
     finally:
         _breaking_news_lock.release()
 
+
 def generate_proposal() -> Optional[Dict]:
     """Génère une proposition secondaire non utilisée"""
     if not _breaking_news_lock.acquire(blocking=False):
         return None
-        
+
     try:
         articles = rss_parser.fetch_new_articles(max_items=config.MAX_ARTICLES_TO_PROCESS)
         if not articles:
@@ -86,10 +89,10 @@ def generate_proposal() -> Optional[Dict]:
             source=article.source,
             summary=article.summary
         )
-        
+
         if not breaking_text:
             return None
-            
+
         return {
             "title": article.title,
             "url": article.url,
@@ -100,3 +103,13 @@ def generate_proposal() -> Optional[Dict]:
         }
     finally:
         _breaking_news_lock.release()
+
+
+def get_latest_news(limit: int = 10) -> Optional[Dict]:
+    """Récupère la dernière breaking news stockée en base."""
+    return database.get_latest_breaking_news()
+
+
+def get_all_news(limit: int = 50) -> List:
+    """Retourne l'historique des breaking news."""
+    return database.get_breaking_news_history(limit=limit)
