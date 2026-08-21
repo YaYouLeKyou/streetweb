@@ -6,6 +6,7 @@ avec 3 hashtags ciblés et un ton journalistique percutant
 pour les faits divers & la culture urbaine.
 """
 
+import json
 import logging
 import re
 import time
@@ -61,6 +62,40 @@ def _clean_generated_post(raw: str) -> str:
     return text
 
 
+def _extract_text_from_json(raw: str) -> Optional[str]:
+    """
+    Tente d'extraire le texte d'une réponse LLM qui aurait été renvoyée
+    sous forme de JSON (ex: {"titre": "..."} ou {"text": "..."}).
+
+    Si la réponse n'est pas du JSON, retourne None pour laisser
+    le traitement normal se faire.
+
+    :param raw: Réponse brute de l'IA
+    :return: Texte extrait du JSON, ou None si ce n'est pas du JSON
+    """
+    text = raw.strip()
+    # Vérifie rapidement si c'est potentiellement du JSON
+    if not (text.startswith("{") and text.endswith("}")):
+        return None
+
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict):
+            # Cherche les clés les plus courantes contenant du texte
+            for key in ("text", "titre", "title", "body", "content", "post", "response"):
+                value = data.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+            # Si aucune clé connue, prend la première valeur string
+            for value in data.values():
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    return None
+
+
 def _call_llm(messages: list, max_tokens: int = 300) -> Optional[str]:
     """
     Appel générique à l'API LLM avec délai anti-rate-limit.
@@ -95,9 +130,11 @@ def _call_llm(messages: list, max_tokens: int = 300) -> Optional[str]:
             client = OpenAI(api_key=provider["key"], base_url=provider["base_url"])
 
             # Configuration spécifique pour forcer le format JSON
+            # Ne force le format JSON QUE si le prompt le demande explicitement
+            # (évite que Gemini enveloppe les réponses textuelles simples en JSON)
             extra_params = {}
-            if "gemini" in provider["model"].lower() or "json" in messages[1]["content"]:
-                # Pour Gemini et les prompts JSON, forcer le format JSON structuré
+            user_content = messages[1]["content"] if len(messages) > 1 else ""
+            if "json" in user_content.lower():
                 extra_params["response_format"] = {"type": "json_object"}
 
             response = client.chat.completions.create(
@@ -161,6 +198,12 @@ def generate_post(title: str, url: str, source: str, summary: str = "") -> Optio
 
     time.sleep(config.AI_GENERATION_DELAY)
 
+    # Safety net : si l'IA a renvoyé du JSON au lieu de texte pur,
+    # tente d'extraire le texte des clés connues
+    extracted = _extract_text_from_json(raw_post)
+    if extracted:
+        raw_post = extracted
+
     post = _clean_generated_post(raw_post)
 
     # Force la présence du lien à la fin si l'IA ne l'a pas inclus
@@ -216,6 +259,12 @@ def generate_long_post(title: str, url: str, source: str, summary: str = "") -> 
 
     time.sleep(config.AI_GENERATION_DELAY)
 
+    # Safety net : si l'IA a renvoyé du JSON au lieu de texte pur,
+    # tente d'extraire le texte des clés connues
+    extracted = _extract_text_from_json(raw_post)
+    if extracted:
+        raw_post = extracted
+
     post = _clean_generated_post(raw_post)
 
     # Force la présence du lien à la fin si l'IA ne l'a pas inclus
@@ -269,6 +318,12 @@ def generate_french_title(title: str, source: str, summary: str = "", max_attemp
 
         time.sleep(config.AI_GENERATION_DELAY)
 
+        # Safety net : si l'IA a renvoyé du JSON au lieu de texte pur,
+        # tente d'extraire le titre des clés connues
+        extracted = _extract_text_from_json(raw_title)
+        if extracted:
+            raw_title = extracted
+
         french_title = _clean_generated_post(raw_title)
         if french_title:
             logger.info("Titre français généré : %s", french_title)
@@ -276,6 +331,7 @@ def generate_french_title(title: str, source: str, summary: str = "", max_attemp
 
     logger.warning("Échec de la génération du titre français après %d tentatives — titre original conservé", max_attempts)
     return title
+
 
 def generate_complete_post(title: str, url: str, source: str, summary: str = "") -> Optional[dict]:
     """
@@ -327,7 +383,6 @@ def generate_complete_post(title: str, url: str, source: str, summary: str = "")
     time.sleep(config.AI_GENERATION_DELAY)
 
     try:
-        import json
         # Nettoyer la réponse pour retirer les blocs Markdown
         clean_response = raw_response.replace("```json", "").replace("```", "").strip()
         # Essaye de parser le JSON directement
