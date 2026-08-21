@@ -183,8 +183,10 @@ def generate_news_job() -> None:
     news = news_service.generate_breaking_news()
     if news:
         logger.info("Post genere : %s", news["title"][:60])
+        logger.info("Lancement publication Facebook + Instagram...")
         publish_news_facebook(news)
         publish_news_instagram(news)
+        logger.info("Cycle de publication termine.")
     else:
         logger.warning("Echec de la generation du post")
 
@@ -307,47 +309,31 @@ def _catch_up_missed_posts(schedule_times: list) -> bool:
     now = datetime.now(paris_tz)  # heure de Paris
     current_time = now.strftime("%H:%M")
 
-    # Récupère les posts publiés aujourd'hui (publiés en UTC, convertis en heure de Paris)
-    published_times_today = set()
-    history = database.get_breaking_news_history(limit=50)
-    for item in history:
-        try:
-            published_dt = datetime.fromisoformat(item.get("published_at", ""))
-            # Le timestamp est stocké en UTC — on le convertit en heure de Paris
-            paris_dt = published_dt.astimezone(paris_tz)
-            if paris_dt.date() == now.date():
-                published_times_today.add(paris_dt.strftime("%H:%M"))
-        except (ValueError, TypeError):
-            continue
-
     caught_up = 0
     # Vérifie chaque heure planifiée (ordonnée pour un rattrapage logique)
     for scheduled_time in sorted(schedule_times):
         if scheduled_time in _caught_up_times:
             continue
-        # Si l'heure planifiée (Paris) est passée et qu'aucun post n'a été fait à cette heure
-        if current_time >= scheduled_time and scheduled_time not in published_times_today:
+        # Si l'heure planifiée (Paris) est passée
+        if current_time >= scheduled_time:
             logger.info(
-                "Post planifié à %s (heure de Paris) manqué (déjà publiés : %s) — rattrapage en cours",
+                "Post planifie a %s (heure de Paris) manque — rattrapage en cours",
                 scheduled_time,
-                sorted(published_times_today) if published_times_today else "aucun",
             )
             try:
                 generate_news_job()
                 _caught_up_times.add(scheduled_time)
-                published_times_today.add(scheduled_time)
                 caught_up += 1
-                logger.info("Rattrapage réussi — post manqué à %s publié", scheduled_time)
+                logger.info("Rattrapage reussi — post manque a %s publie", scheduled_time)
             except Exception as exc:  # noqa: BLE001
                 logger.error("Erreur lors du post de rattrapage : %s", exc)
                 _caught_up_times.add(scheduled_time)
                 break
 
     if caught_up:
-        # Replanifions car les heures de rattrapage ne doivent pas re-déclencher
         reschedule_global()
     else:
-        logger.info("Aucun post manqué — tous les posts planifiés ont été publiés")
+        logger.info("Aucun post manque — tous les posts planifies ont ete publies")
     return caught_up > 0
 
 

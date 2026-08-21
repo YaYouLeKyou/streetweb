@@ -491,6 +491,150 @@ def api_post_now():
     return jsonify(result)
 
 
+@app.route("/api/force-publish", methods=["POST"])
+def api_force_publish():
+    """
+    API : publie IMMEDIATEMENT le dernier post généré sur Facebook et/ou Instagram.
+    Ne génère PAS de nouveau contenu : prend le dernier post en base.
+    Permet de valider la publication Meta sans attendre le scheduler ni les RSS.
+    """
+    data = request.get_json(silent=True) or {}
+    raw_network = data.get("network", "facebook,instagram")
+    if isinstance(raw_network, str):
+        networks = [n.strip() for n in raw_network.split(",") if n.strip()]
+    else:
+        networks = [str(raw_network)]
+
+    valid_networks = [n for n in networks if n in ("facebook", "instagram")]
+    if not valid_networks:
+        valid_networks = ["facebook", "instagram"]
+
+    post_facebook = "facebook" in valid_networks
+    post_instagram = "instagram" in valid_networks
+
+    latest = news_service.get_latest_news()
+    if not latest:
+        return jsonify({
+            "error": "Aucun post disponible en base.",
+            "detail": "Générez d'abord un post via /api/refresh ou attendez la prochaine génération RSS.",
+        }), 404
+
+    progress = []
+    result = {
+        "success": True,
+        "network": ",".join(valid_networks),
+        "news_id": latest.get("id"),
+        "progress": progress,
+    }
+
+    facebook_published = False
+    facebook_error = None
+    if post_facebook:
+        progress.append({"step": "facebook", "message": "Envoi du post Facebook…", "done": False})
+        if not config.DRY_RUN and config.FB_PAGE_ACCESS_TOKEN and config.FACEBOOK_PAGE_ID:
+            try:
+                facebook = facebook_client.FacebookClient()
+                if facebook.configure():
+                    facebook_message = latest.get("long_text") or _build_long_post_message(latest)
+                    raw_image = latest.get("image") or ""
+                    facebook_image = facebook_client.get_valid_instagram_image(
+                        caption=latest.get("breaking_text", ""),
+                        user_image_url=raw_image,
+                        title=latest.get("title", ""),
+                    )
+                    facebook_published = facebook.post_to_page(
+                        message=facebook_message,
+                        link=latest.get("url", ""),
+                        image_url=facebook_image,
+                    )
+                    logger.info("FORCE Post Facebook publie : %s (ID news=%s)", facebook_published, latest.get("id"))
+                    progress[-1]["done"] = True
+                    progress[-1]["success"] = facebook_published
+                    if not facebook_published:
+                        facebook_error = "Echec de la publication Facebook — voir les logs serveur"
+                        progress[-1]["error"] = facebook_error
+                else:
+                    facebook_error = "Token Facebook invalide ou expire"
+                    progress[-1]["done"] = True
+                    progress[-1]["success"] = False
+                    progress[-1]["error"] = facebook_error
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Erreur force-publish Facebook : %s", exc)
+                facebook_error = str(exc)
+                progress[-1]["done"] = True
+                progress[-1]["success"] = False
+                progress[-1]["error"] = facebook_error
+        else:
+            progress[-1]["done"] = True
+            progress[-1]["success"] = False
+            if config.DRY_RUN:
+                progress[-1]["error"] = "Mode dry-run active"
+            else:
+                progress[-1]["error"] = "Facebook non configure"
+    else:
+        progress.append({"step": "facebook", "message": "Facebook non selectionne", "done": True, "skipped": True})
+
+    result["facebook_published"] = facebook_published
+    result["facebook_error"] = facebook_error
+
+    instagram_published = False
+    instagram_error = None
+    if post_instagram:
+        progress.append({"step": "instagram", "message": "Envoi du post Instagram…", "done": False})
+        if not config.DRY_RUN and config.FB_PAGE_ACCESS_TOKEN and config.INSTAGRAM_ACCOUNT_ID:
+            try:
+                facebook = facebook_client.FacebookClient()
+                if facebook.configure():
+                    instagram_image = facebook_client.get_valid_instagram_image(
+                        caption=latest.get("breaking_text", ""),
+                        user_image_url=latest.get("image"),
+                        title=latest.get("title", ""),
+                    )
+                    instagram_message = latest.get("long_text") or _build_long_post_message(latest)
+                    instagram_published = facebook.post_to_instagram(
+                        message=instagram_message,
+                        image_url=instagram_image,
+                    )
+                    logger.info("FORCE Post Instagram publie : %s (ID news=%s)", instagram_published, latest.get("id"))
+                    progress[-1]["done"] = True
+                    progress[-1]["success"] = instagram_published
+                    if not instagram_published:
+                        instagram_error = "Echec de la publication Instagram — voir les logs serveur"
+                        progress[-1]["error"] = instagram_error
+                else:
+                    instagram_error = "Token Instagram invalide ou expire"
+                    progress[-1]["done"] = True
+                    progress[-1]["success"] = False
+                    progress[-1]["error"] = instagram_error
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Erreur force-publish Instagram : %s", exc)
+                instagram_error = str(exc)
+                progress[-1]["done"] = True
+                progress[-1]["success"] = False
+                progress[-1]["error"] = instagram_error
+        else:
+            progress[-1]["done"] = True
+            progress[-1]["success"] = False
+            if config.DRY_RUN:
+                progress[-1]["error"] = "Mode dry-run active"
+            else:
+                progress[-1]["error"] = "Instagram non configure"
+    else:
+        progress.append({"step": "instagram", "message": "Instagram non selectionne", "done": True, "skipped": True})
+
+    result["instagram_published"] = instagram_published
+    result["instagram_error"] = instagram_error
+
+    has_success = (post_facebook and facebook_published) or (post_instagram and instagram_published)
+    result["success"] = has_success
+    if has_success:
+        progress.append({"step": "done", "message": "Publication forcee reussie !", "done": True, "final": True})
+    else:
+        progress.append({"step": "done", "message": "Publication forcee echouee", "done": True, "final": True, "error": True})
+
+    return jsonify(result)
+
+
 @app.route("/api/facebook/status")
 def api_facebook_status():
     """API : vérifie si Facebook est configuré."""

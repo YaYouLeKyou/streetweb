@@ -18,10 +18,10 @@ import config
 
 logger = logging.getLogger(__name__)
 
-# Timeout et retry pour les requêtes RSS
-_FEED_TIMEOUT = 20  # secondes
-_FEED_MAX_RETRIES = 3
-_FEED_RETRY_BACKOFF = 2  # multiplicateur exponentiel: 1s, 2s, 4s
+# Timeout et retry pour les requêtes RSS (depuis config.py)
+_FEED_TIMEOUT = getattr(config, "FEED_TIMEOUT", 8)
+_FEED_MAX_RETRIES = getattr(config, "FEED_MAX_RETRIES", 2)
+_FEED_RETRY_BACKOFF = getattr(config, "FEED_RETRY_BACKOFF", 2)  # 1s, 2s
 _FEED_USER_AGENT = "Mozilla/5.0 (compatible; Streetweb/1.0; +https://streetweb.local)"
 
 

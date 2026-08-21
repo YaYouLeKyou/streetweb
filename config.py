@@ -58,14 +58,18 @@ TOKEN_RENEWAL_DAYS = int(os.getenv("TOKEN_RENEWAL_DAYS", "30"))
 DEFAULT_RSS_FEEDS = [
     # 🇫🇷 Francophone — Faits divers & Société
     "https://www.leparisien.fr/faits-divers/rss.xml",
-    "https://www.20minutes.fr/faits-divers/rss.xml",
-    "https://www.bfmtv.com/faits-divers/rss.xml",
-    "https://www.francetvinfo.fr/faits-divers/rss.xml",
+    # 20minutes, bfmtv, francetvinfo, lemonde sont desagreges/redirecteurs
+    # et renvoient 403/400/404 depuis les hebergeurs : desactives pour
+    # ne pas bloquer le worker pendant 20s x 3 retries chacun.
     # 🇫🇷 Culture urbaine — Rap, Street Art, Tendances
     "https://www.booska-p.com/feed/",
     "https://www.rap2france.com/feed/",
-    "https://www.lemonde.fr/culture/rss.xml",
 ]
+
+# Timeout/retry RSS (raccourcis pour ne pas bloquer le worker)
+FEED_TIMEOUT = 8  # secondes
+FEED_MAX_RETRIES = 2
+FEED_RETRY_BACKOFF = 2  # 1s, 2s
 
 # Liste des flux effectifs :
 #   - Si la variable d'environnement RSS_FEED_URLS est définie, on l'utilise
