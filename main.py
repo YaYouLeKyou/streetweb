@@ -177,7 +177,7 @@ def publish_news_instagram(news: dict) -> bool:
 # ─────────────────────────────────────────────────────────────
 # Génération + publication d'un post
 # ─────────────────────────────────────────────────────────────
-def generate_news_job() -> None:
+def generate_news_job() -> bool:
     """Génère un nouveau post et le publie sur Facebook + Instagram."""
     logger.info("=== Génération planifiée d'un post ===")
     news = news_service.generate_breaking_news()
@@ -187,8 +187,10 @@ def generate_news_job() -> None:
         publish_news_facebook(news)
         publish_news_instagram(news)
         logger.info("Cycle de publication termine.")
+        return True
     else:
         logger.warning("Echec de la generation du post")
+        return False
 
 
 # ─────────────────────────────────────────────────────────────
