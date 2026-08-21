@@ -151,7 +151,8 @@ def paris_time_to_utc(hhmm: str) -> str:
         # Utilise la date du jour pour un calcul correct été/hiver.
         now = datetime.now(paris_tz)
         naive = now.replace(hour=int(hour_str), minute=int(minute_str), second=0, microsecond=0)
-        utc_dt = naive.astimezone(timezone.utc)
+        paris_aware = naive.replace(tzinfo=paris_tz)
+        utc_dt = paris_aware.astimezone(timezone.utc)
         return utc_dt.strftime("%H:%M")
     except (ValueError, TypeError, ImportError, KeyError) as exc:
         # Fallback : if zoneinfo est indisponible (ex: Windows sans tzdata),
