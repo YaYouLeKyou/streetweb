@@ -181,9 +181,16 @@ def publish_news_instagram(news: dict) -> bool:
 def generate_news_job() -> bool:
     """Génère un nouveau post et le publie sur Facebook + Instagram."""
     logger.info("=== Génération planifiée d'un post ===")
+    # Vérifier anti-doublons en base avant génération
+    from database import is_article_processed
+    # On ne peut pas encore vérifier ici car news_service.call n'a pas encore eu lieu
     news = news_service.generate_breaking_news()
     if news:
         logger.info("Post genere : %s", news["title"][:60])
+        # Vérifier si cet article a déjà été publié (protection anti-doublons)
+        if is_article_processed(news.get("url", "")):
+            logger.warning("Article déjà publié en base - nouvelle génération ignorée")
+            return False
         logger.info("Envoi du post aux API Facebook/Instagram...")
         # Publication Facebook
         try:
@@ -322,6 +329,7 @@ def _catch_up_missed_posts(schedule_times: list) -> bool:
 
     RATTRAPE TOUS LES POSTS MANQUÉS (pas seulement un seul).
     Ne retente pas deux fois la même heure planifiée.
+    vérifie d'abord la base de données anti-doublons avant de rattraper.
 
     :return: True si au moins un post de rattrapage a été exécuté, False sinon
     """
@@ -341,10 +349,24 @@ def _catch_up_missed_posts(schedule_times: list) -> bool:
         # Si l'heure planifiée (Paris) est passée
         if current_time >= scheduled_time:
             logger.info(
-                "Post planifie a %s (heure de Paris) manque — rattrapage en cours",
+                "Post planifie a %s (heure de Paris) manque — vérification anti-doublons avant rattrapage",
                 scheduled_time,
             )
             try:
+                # Obtenir la breaking news à publier à cette heure
+                news = database.get_latest_breaking_news()
+                if news:
+                    # Vérifier si cette actualité a déjà été publiée via la base de données
+                    if database.is_article_processed(news.get("url", "")):
+                        logger.info(
+                            "Actualité déjà traitée en base — passage au temps planifié suivant",
+                            scheduled_time,
+                        )
+                        _caught_up_times.add(scheduled_time)
+                        continue
+
+                # Si non déjà traitée, effectuer le rattrapage
+                logger.info("Actualité non encore traitée — rattrapage en cours pour l'heure %s", scheduled_time)
                 if generate_news_job():
                     _caught_up_times.add(scheduled_time)
                     caught_up += 1
