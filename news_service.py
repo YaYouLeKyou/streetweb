@@ -15,6 +15,7 @@ import config
 import database
 import rss_parser
 import ai_generator
+import publisher
 
 logger = logging.getLogger(__name__)
 

@@ -29,6 +29,7 @@ import facebook_client
 import news_service
 import token_renewal
 import web_app
+import publisher
 from web_app import _build_long_post_message
 
 # Import de la fonction utilitaire pour le fallback d'image Instagram

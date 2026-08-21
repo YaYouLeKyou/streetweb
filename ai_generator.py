@@ -286,7 +286,7 @@ def generate_complete_post(title: str, url: str, source: str, summary: str = "")
     :param url: Lien de l'article
     :param source: Nom de la source
     :param summary: Résumé de l'article
-    :return: dict avec 'title' et 'body', ou None si échec
+    :return: dict avec 'title', 'body', 'long_body', ou None si échec
     """
     prompt = f"""Génère un post complet en français avec les éléments suivants :
 
@@ -320,7 +320,8 @@ def generate_complete_post(title: str, url: str, source: str, summary: str = "")
         return {
             "title": title,
             "body": f"{title}\n{url} #FaitsDivers",
-            "long_body": f"{title}\n\n{summary or ''}\n\n{url} #FaitsDivers"
+            "long_body": f"{title}\n\n{summary or ''}\n\n{url} #FaitsDivers",
+            "fallback_mode": True
         }
 
     time.sleep(config.AI_GENERATION_DELAY)
@@ -340,5 +341,6 @@ def generate_complete_post(title: str, url: str, source: str, summary: str = "")
         return {
             "title": title,
             "body": f"{title}\n{url} #FaitsDivers",
-            "long_body": f"{title}\n\n{summary or ''}\n\n{url} #FaitsDivers"
+            "long_body": f"{title}\n\n{summary or ''}\n\n{url} #FaitsDivers",
+            "fallback_mode": True
         }
