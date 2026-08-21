@@ -1,6 +1,15 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Union
 
+from flask import Flask
+app = Flask(__name__)
+
+
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional, Union
+
+
+
 @ app.route("/")
 def index():
     """Page principale : affiche le dernier post + historique."""
