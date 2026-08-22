@@ -50,8 +50,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("streetweb-agent")
 
-# Set mémoire des heures déjà rattrapées pendant la durée de vie du worker
-_caught_up_times = set()
 
 
 # ─────────────────────────────────────────────────────────────
@@ -181,16 +179,14 @@ def publish_news_instagram(news: dict) -> bool:
 def generate_news_job() -> bool:
     """Génère un nouveau post et le publie sur Facebook + Instagram."""
     logger.info("=== Génération planifiée d'un post ===")
-    # Vérifier anti-doublons en base avant génération
-    from database import is_article_processed
-    # On ne peut pas encore vérifier ici car news_service.call n'a pas encore eu lieu
+    # NB : l'anti-doublon est géré en amont par rss_parser.fetch_new_articles()
+    # (qui exclut les articles déjà présents en base) et par
+    # news_service.generate_breaking_news() (qui marque l'article comme traité).
+    # NE PAS revérifier ici : l'article vient d'être marqué « traité » lors de
+    # la génération, un contrôle à ce stade bloquerait toute publication.
     news = news_service.generate_breaking_news()
     if news:
         logger.info("Post genere : %s", news["title"][:60])
-        # Vérifier si cet article a déjà été publié (protection anti-doublons)
-        if is_article_processed(news.get("url", "")):
-            logger.warning("Article déjà publié en base - nouvelle génération ignorée")
-            return False
         logger.info("Envoi du post aux API Facebook/Instagram...")
         # Publication Facebook
         try:
@@ -273,18 +269,29 @@ def setup_schedule() -> None:
         else:
             for time_str in schedule_times:
                 # Les heures de la config sont TOUJOURS en heure de Paris.
-                # Conversion explicite Paris → UTC : le worker Render/Railway
-                # tourne en UTC, et on évite ainsi toute dépendance au
-                # paramètre `tz` de la librairie `schedule` (source de bugs).
-                # La conversion gère automatiquement l'heure d'été (UTC+2)
-                # et l'heure d'hiver (UTC+1).
-                utc_time = paris_time_to_utc(time_str)
-                schedule.every().day.at(utc_time).do(generate_news_job)
-                logger.info(
-                    "Post planifié : %s (heure Paris = %s UTC)",
-                    time_str,
-                    utc_time,
-                )
+                # On planifie DIRECTEMENT dans le fuseau Europe/Paris :
+                # la librairie `schedule` (>= 1.2) gère nativement les fuseaux
+                # et le passage à l'heure d'été/hiver, ce qu'une conversion
+                # UTC figée au démarrage ne peut pas garantir.
+                try:
+                    schedule.every().day.at(time_str, config.LOCAL_TIMEZONE).do(generate_news_job)
+                    utc_now = paris_time_to_utc(time_str)
+                    logger.info(
+                        "Post planifié : %s (heure de Paris = %s UTC actuellement)",
+                        time_str,
+                        utc_now,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    # Repli : conversion manuelle Paris → UTC si le fuseau
+                    # n'est pas supporté par la version de `schedule` installée.
+                    utc_time = paris_time_to_utc(time_str)
+                    schedule.every().day.at(utc_time).do(generate_news_job)
+                    logger.warning(
+                        "Fuseau non supporté par `schedule` (%s) — repli sur %s UTC pour %s",
+                        exc,
+                        utc_time,
+                        time_str,
+                    )
 
             if not schedule_times:
                 # Protection contre schedule.every(0).hours (heure locale invalide).
@@ -323,66 +330,63 @@ def reschedule_global() -> None:
 
 def _catch_up_missed_posts(schedule_times: list) -> bool:
     """
-    Vérifie si des publications planifiées ont été manquées au démarrage
-    ou lors d'un réveil du worker (ex : plan gratuit Render qui s'endort
-    après 15 min d'inactivité).
+    Vérifie au démarrage (ou au réveil du worker, ex : plan gratuit Render)
+    si le dernier créneau planifié passé n'a pas donné lieu à une publication.
 
-    RATTRAPE TOUS LES POSTS MANQUÉS (pas seulement un seul).
-    Ne retente pas deux fois la même heure planifiée.
-    vérifie d'abord la base de données anti-doublons avant de rattraper.
+    Rattrape AU MAXIMUM UN SEUL post (le créneau le plus récent passé),
+    et uniquement si aucune publication n'a eu lieu depuis ce créneau.
+    L'état est lu en base de données (dernière breaking news) afin de
+    survivre aux redémarrages, contrairement à un état mémoire.
 
-    :return: True si au moins un post de rattrapage a été exécuté, False sinon
+    :return: True si un post de rattrapage a été exécuté, False sinon
     """
     if not schedule_times or config.NEWS_INTERVAL_HOURS > 0:
         return False
 
-    # Les heures sont en heure de Paris — nous devons comparer en heure de Paris
+    # Les heures sont en heure de Paris — nous comparons en heure de Paris
     paris_tz = get_paris_tz()
-    now = datetime.now(paris_tz)  # heure de Paris
+    now = datetime.now(paris_tz)
     current_time = now.strftime("%H:%M")
 
-    caught_up = 0
-    # Vérifie chaque heure planifiée (ordonnée pour un rattrapage logique)
-    for scheduled_time in sorted(schedule_times):
-        if scheduled_time in _caught_up_times:
-            continue
-        # Si l'heure planifiée (Paris) est passée
-        if current_time >= scheduled_time:
-            logger.info(
-                "Post planifie a %s (heure de Paris) manque — vérification anti-doublons avant rattrapage",
-                scheduled_time,
-            )
-            try:
-                # Obtenir la breaking news à publier à cette heure
-                news = database.get_latest_breaking_news()
-                if news:
-                    # Vérifier si cette actualité a déjà été publiée via la base de données
-                    if database.is_article_processed(news.get("url", "")):
-                        logger.info(
-                            "Actualité déjà traitée en base — passage au temps planifié suivant",
-                            scheduled_time,
-                        )
-                        _caught_up_times.add(scheduled_time)
-                        continue
+    # Dernier créneau planifié déjà passé aujourd'hui (heure de Paris)
+    past_slots = [t for t in sorted(schedule_times) if t <= current_time]
+    if not past_slots:
+        logger.info("Aucun creneau passe aujourd'hui — pas de rattrapage necessaire")
+        return False
 
-                # Si non déjà traitée, effectuer le rattrapage
-                logger.info("Actualité non encore traitée — rattrapage en cours pour l'heure %s", scheduled_time)
-                if generate_news_job():
-                    _caught_up_times.add(scheduled_time)
-                    caught_up += 1
-                    logger.info("Rattrapage reussi — post manque a %s publie", scheduled_time)
-                else:
-                    logger.warning("Rattrapage ignoré — génération du post échouée pour %s", scheduled_time)
-            except Exception as exc:  # noqa: BLE001
-                logger.error("Erreur lors du post de rattrapage : %s", exc)
-                _caught_up_times.add(scheduled_time)
-                break
+    last_slot = past_slots[-1]
+    slot_hour, slot_minute = (int(p) for p in last_slot.split(":"))
+    slot_dt = now.replace(hour=slot_hour, minute=slot_minute, second=0, microsecond=0)
 
-    if caught_up:
-        reschedule_global()
-    else:
-        logger.info("Aucun post manque — tous les posts planifies ont ete publies")
-    return caught_up > 0
+    # Une publication a-t-elle déjà eu lieu depuis ce créneau ?
+    latest = database.get_latest_breaking_news()
+    if latest and latest.get("published_at"):
+        try:
+            clean = str(latest["published_at"]).replace("Z", "+00:00")
+            last_pub = datetime.fromisoformat(clean)
+            if last_pub.tzinfo is None:
+                last_pub = last_pub.replace(tzinfo=timezone.utc)
+            if last_pub.astimezone(paris_tz) >= slot_dt:
+                logger.info(
+                    "Dernier post deja publie apres le creneau de %s (heure de Paris) — pas de rattrapage",
+                    last_slot,
+                )
+                return False
+        except ValueError:
+            logger.warning("Date de derniere publication illisible — rattrapage autorise")
+
+    logger.info(
+        "Creneau de %s (heure de Paris) manque — rattrapage d'un seul post",
+        last_slot,
+    )
+    try:
+        if generate_news_job():
+            logger.info("Rattrapage reussi — post manque a %s publie", last_slot)
+            return True
+        logger.warning("Rattrapage echoue — generation du post impossible pour %s", last_slot)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Erreur lors du post de rattrapage : %s", exc)
+    return False
 
 
 # ─────────────────────────────────────────────────────────────
@@ -404,15 +408,22 @@ def start_web_server() -> None:
 # Point d'entrée principal
 # ─────────────────────────────────────────────────────────────
 def _generate_initial_news() -> None:
-    """Génère le premier post en arrière-plan (thread séparé)."""
+    """Cycle initial au démarrage (thread séparé).
+
+    IMPORTANT : aucune publication immédiate hors mode test.
+    Les posts sont publiés STRICTEMENT aux horaires planifiés
+    (7h, 12h, 17h, 20h heure de Paris). Un créneau manqué est
+    géré par _catch_up_missed_posts(), pas par un post de démarrage.
+    """
     try:
         if config.TEST_ON_STARTUP:
             logger.info("TEST_ON_STARTUP=true — exécution immédiate d'un cycle complet")
             generate_news_job()
         else:
-            # Génération immédiate d'un premier post (avec publication)
-            logger.info("Génération du premier post et publication...")
-            generate_news_job()
+            logger.info(
+                "Pas de publication immediate au demarrage — posts planifies a : %s (heure de Paris)",
+                ", ".join(config.SCHEDULE_TIMES),
+            )
     except Exception as exc:  # noqa: BLE001
         logger.error("Erreur lors de la génération initiale : %s", exc)
 
