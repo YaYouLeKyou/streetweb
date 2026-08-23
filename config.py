@@ -17,22 +17,51 @@ logger = logging.getLogger(__name__)
 # Chargement des variables d'environnement (.env)
 load_dotenv()
 
+
+def _env_str(name: str, default: str) -> str:
+    """
+    Récupère une variable d'environnement en traitant la valeur vide
+    comme absente. Important pour GitHub Actions : un secret non défini
+    est injecté comme chaîne VIDE et écraserait sinon la valeur par défaut.
+    """
+    value = os.getenv(name, "").strip()
+    return value if value else default
+
+
+def _env_int(name: str, default: int) -> int:
+    """
+    Récupère un entier depuis l'environnement, avec repli sur la valeur
+    par défaut si la variable est absente, vide ou invalide.
+    """
+    raw = os.getenv(name, "").strip()
+    try:
+        return int(raw) if raw else default
+    except ValueError:
+        logger.warning(
+            "Variable %s invalide (%r) — valeur par défaut %d utilisée",
+            name, raw, default,
+        )
+        return default
+
 # ─────────────────────────────────────────────────────────────
 # API LLM (OpenAI SDK compatible — Gemini / Groq)
 # ─────────────────────────────────────────────────────────────
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
-LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3.5-flash-lite")
+LLM_BASE_URL = _env_str(
+    "LLM_BASE_URL",
+    "https://generativelanguage.googleapis.com/v1beta/openai/",
+)
+LLM_MODEL = _env_str("LLM_MODEL", "gemini-3.5-flash-lite")
 # Nombre max de tokens — Gemini a un mode "thinking" qui consomme
 # des tokens avant la réponse. 2000 garantit un post complet.
-LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "2000"))
+LLM_MAX_TOKENS = _env_int("LLM_MAX_TOKENS", 2000)
 
 # ─────────────────────────────────────────────────────────────
 # Fallback LLM — Groq (si Gemini est indisponible)
 # ─────────────────────────────────────────────────────────────
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "groq/compound-mini")
+GROQ_BASE_URL = _env_str("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+GROQ_MODEL = _env_str("GROQ_MODEL", "groq/compound-mini")
 
 # ─────────────────────────────────────────────────────────────
 # API Facebook / Meta (Graph API) — Facebook + Instagram
@@ -72,7 +101,7 @@ FB_APP_SECRET = os.getenv("FB_APP_SECRET", "")
 # Nombre de jours entre deux renouvellements automatiques des tokens.
 # Les tokens Meta durent 60 jours — un renouvellement tous les
 # 30 jours garantit une marge de sécurité confortable.
-TOKEN_RENEWAL_DAYS = int(os.getenv("TOKEN_RENEWAL_DAYS", "30"))
+TOKEN_RENEWAL_DAYS = _env_int("TOKEN_RENEWAL_DAYS", 30)
 
 # ─────────────────────────────────────────────────────────────
 # Flux RSS spécialisés « Faits Divers & Culture Urbaine »
@@ -106,7 +135,7 @@ else:
 # ─────────────────────────────────────────────────────────────
 # Base de données SQLite (anti-doublons)
 # ─────────────────────────────────────────────────────────────
-DB_PATH = os.getenv("DB_PATH", "streetweb_bot.db")
+DB_PATH = _env_str("DB_PATH", "streetweb_bot.db")
 
 # ─────────────────────────────────────────────────────────────
 # Planification — Posts par heures fixes
@@ -129,7 +158,7 @@ else:
 
 # Fréquence de génération des posts (en heures)
 # Défaut : 0 = désactivé (utiliser les heures fixes)
-NEWS_INTERVAL_HOURS = int(os.getenv("NEWS_INTERVAL_HOURS", "0"))
+NEWS_INTERVAL_HOURS = _env_int("NEWS_INTERVAL_HOURS", 0)
 
 
 def get_paris_tz():
@@ -235,7 +264,7 @@ def utc_time_to_paris(hhmm: str) -> str:
 # ─────────────────────────────────────────────────────────────
 # Serveur web (Flask)
 # ─────────────────────────────────────────────────────────────
-WEB_PORT = int(os.getenv("WEB_PORT", "5000"))
+WEB_PORT = _env_int("WEB_PORT", 5000)
 
 # ─────────────────────────────────────────────────────────────
 # Publication
@@ -249,14 +278,14 @@ MAX_ARTICLES_TO_PROCESS = 30  # articles maximum scannés par exécution
 # Délai (en secondes) entre deux appels à l'API LLM lors de la
 # génération de plusieurs propositions (anti rate-limit TPM).
 # Il est configurable via la variable d'environnement AI_GENERATION_DELAY.
-AI_GENERATION_DELAY = int(os.getenv("AI_GENERATION_DELAY", "15"))
+AI_GENERATION_DELAY = _env_int("AI_GENERATION_DELAY", 15)
 
 # ─────────────────────────────────────────────────────────────
 # Historique des posts
 # ─────────────────────────────────────────────────────────────
 # Nombre maximum d'articles conservés dans l'historique.
 # Au-delà, les plus anciens sont automatiquement supprimés.
-MAX_HISTORY_SIZE = int(os.getenv("MAX_HISTORY_SIZE", "50"))
+MAX_HISTORY_SIZE = _env_int("MAX_HISTORY_SIZE", 50)
 
 # ─────────────────────────────────────────────────────────────
 # Mode test
@@ -280,8 +309,8 @@ ALERT_EMAIL = os.getenv("ALERT_EMAIL", "yanes75@hotmail.fr")
 SMTP_ENABLED = os.getenv("SMTP_ENABLED", "false").strip().lower() in ("true", "1", "yes")
 
 # Configuration SMTP
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_HOST = _env_str("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = _env_int("SMTP_PORT", 587)
 SMTP_TLS = os.getenv("SMTP_TLS", "true").strip().lower() in ("true", "1", "yes")
 SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
