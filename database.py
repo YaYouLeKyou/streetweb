@@ -5,6 +5,7 @@ Stocke les liens d'articles déjà traités afin d'éviter
 de republier la même actualité sur les réseaux sociaux.
 """
 
+import os
 import sqlite3
 import logging
 from datetime import datetime, timezone
@@ -47,6 +48,11 @@ CREATE TABLE IF NOT EXISTS breaking_news (
 
 def get_connection() -> sqlite3.Connection:
     """Retourne une connexion SQLite (avec vérification des clés étrangères)."""
+    # S'assure que le dossier parent de la base existe (ex : data/ sur
+    # GitHub Actions, où le dossier peut ne pas être présent dans le dépôt).
+    db_dir = os.path.dirname(config.DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
     conn = sqlite3.connect(config.DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL;")
