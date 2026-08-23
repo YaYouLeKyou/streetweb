@@ -66,7 +66,11 @@ def _call_llm(messages: list, max_tokens: int = 300) -> Optional[str]:
     for provider in providers:
         try:
             logger.info(f"Tentative LLM {provider['name']}")
-            client = OpenAI(api_key=provider["key"], base_url=provider["base_url"])
+            client = OpenAI(
+                api_key=provider["key"],
+                base_url=provider["base_url"],
+                timeout=60.0,
+            )
             response = client.chat.completions.create(
                 model=provider["model"],
                 messages=messages,
@@ -76,7 +80,16 @@ def _call_llm(messages: list, max_tokens: int = 300) -> Optional[str]:
             logger.info("Succès avec %s", provider["name"])
             return response.choices[0].message.content
         except Exception as exc:
-            logger.warning(f"Échec {provider['name']} : {exc}")
+            # Log détaillé : type d'exception + base_url pour diagnostic
+            # (ex : secret mal copié, URL invalide, réseau, quota…)
+            logger.warning(
+                "Échec %s (base_url=%s, model=%s) — %s : %s",
+                provider["name"],
+                provider["base_url"],
+                provider["model"],
+                type(exc).__name__,
+                exc,
+            )
     logger.warning("Tous les fournisseurs LLM ont échoué")
     return None
 
