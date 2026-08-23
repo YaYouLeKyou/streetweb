@@ -111,6 +111,39 @@ def generate_french_title(title: str, source: str, summary: str = "") -> str:
         time.sleep(config.AI_GENERATION_DELAY)
     return title
 
+def _parse_llm_json(raw_response: str) -> Optional[dict]:
+    """
+    Extrait et valide l'objet JSON {title, body, long_body} d'une réponse LLM.
+
+    Tolère les balises markdown (```json ... ```), le texte avant/après
+    l'objet JSON, et les espaces superflus.
+
+    :return: dict avec les clés title/body/long_body, ou None si non conforme
+    """
+    clean = raw_response.strip()
+    # Suppression des balises markdown éventuelles
+    clean = re.sub(r"^```(?:json)?\s*", "", clean)
+    clean = re.sub(r"\s*```$", "", clean).strip()
+
+    # Extraction de la portion { ... } la plus large
+    start, end = clean.find("{"), clean.rfind("}")
+    if start == -1 or end <= start:
+        return None
+
+    try:
+        data = json.loads(clean[start:end + 1])
+    except json.JSONDecodeError:
+        return None
+
+    if isinstance(data, dict) and {"title", "body", "long_body"}.issubset(data.keys()):
+        return {
+            "title": str(data["title"]).strip(),
+            "body": str(data["body"]).strip(),
+            "long_body": str(data["long_body"]).strip(),
+        }
+    return None
+
+
 def generate_complete_post(title: str, url: str, source: str, summary: str = "") -> Optional[dict]:
     prompt = config.AI_LONG_POST_PROMPT_TEMPLATE.format(
         title=title,
@@ -134,15 +167,23 @@ def generate_complete_post(title: str, url: str, source: str, summary: str = "")
             "fallback_mode": True
         }
 
-    try:
-        clean_response = raw_response.replace("```json", "").replace("```", "").strip()
-        result = json.loads(clean_response)
-        if {"title", "body", "long_body"}.issubset(result.keys()):
-            logger.info("Post complet généré en un seul appel LLM")
-            return result
-    except (json.JSONDecodeError, KeyError):
-        logger.warning("Réponse LLM non conforme au format JSON attendu")
-    
+    result = _parse_llm_json(raw_response)
+    if result:
+        logger.info("Post complet généré en un seul appel LLM")
+        return result
+
+    # La réponse n'est pas du JSON conforme : on réutilise quand même le texte
+    # généré plutôt que de le jeter (mode dégradé local).
+    logger.warning("Réponse LLM non conforme au format JSON attendu — utilisation du texte brut")
+    text = _clean_generated_post(raw_response)
+    if text:
+        return {
+            "title": title,
+            "body": _truncate_post(f"{text}", url),
+            "long_body": _truncate_post(f"{text}", url),
+            "fallback_mode": True,
+        }
+
     return {
         "title": title,
         "body": f"{title}\n{url} #FaitsDivers",

@@ -28,6 +28,37 @@ def _env_str(name: str, default: str) -> str:
     return value if value else default
 
 
+def _env_secret(name: str) -> str:
+    """
+    Récupère une variable d'environnement « sensible » (clé API, ID, token)
+    en supprimant TOUS les espaces blancs périphériques : espaces,
+    retours à la ligne (\\n) et retours chariot (\\r).
+
+    Critique pour GitHub Actions : un secret collé avec un saut de ligne
+    final produit des requêtes API invalides du type
+    « Object with ID 'xxx\\n' does not exist » (erreur Meta code 100/33)
+    ou des erreurs de connexion LLM (APIConnectionError).
+    """
+    return os.getenv(name, "").strip()
+
+
+def _env_base_url(name: str, default: str) -> str:
+    """
+    Récupère une URL de base d'API en la nettoyant :
+    suppression des blancs, guillemets parasites, et vérification du schéma.
+    """
+    raw = os.getenv(name, "").strip().strip('"').strip("'").strip()
+    if not raw:
+        return default
+    if not raw.startswith(("http://", "https://")):
+        logger.warning(
+            "Variable %s invalide (%r…) — URL par défaut utilisée : %s",
+            name, raw[:30], default,
+        )
+        return default
+    return raw
+
+
 def _env_int(name: str, default: int) -> int:
     """
     Récupère un entier depuis l'environnement, avec repli sur la valeur
@@ -46,8 +77,8 @@ def _env_int(name: str, default: int) -> int:
 # ─────────────────────────────────────────────────────────────
 # API LLM (OpenAI SDK compatible — Gemini / Groq)
 # ─────────────────────────────────────────────────────────────
-LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-LLM_BASE_URL = _env_str(
+LLM_API_KEY = _env_secret("LLM_API_KEY")
+LLM_BASE_URL = _env_base_url(
     "LLM_BASE_URL",
     "https://generativelanguage.googleapis.com/v1beta/openai/",
 )
@@ -59,8 +90,8 @@ LLM_MAX_TOKENS = _env_int("LLM_MAX_TOKENS", 2000)
 # ─────────────────────────────────────────────────────────────
 # Fallback LLM — Groq (si Gemini est indisponible)
 # ─────────────────────────────────────────────────────────────
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_BASE_URL = _env_str("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+GROQ_API_KEY = _env_secret("GROQ_API_KEY")
+GROQ_BASE_URL = _env_base_url("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 GROQ_MODEL = _env_str("GROQ_MODEL", "groq/compound-mini")
 
 # ─────────────────────────────────────────────────────────────
@@ -71,32 +102,44 @@ GROQ_MODEL = _env_str("GROQ_MODEL", "groq/compound-mini")
 # ─────────────────────────────────────────────────────────────
 
 # Récupération flexible du token Facebook
+# (.strip() obligatoire : un secret GitHub collé avec \\n final casse l'API)
 FB_PAGE_ACCESS_TOKEN = (
-    os.getenv("FB_PAGE_ACCESS_TOKEN")
-    or os.getenv("FACEBOOK_ACCESS_TOKEN")
-    or os.getenv("FB_ACCESS_TOKEN")
-    or os.getenv("META_ACCESS_TOKEN")
+    _env_secret("FB_PAGE_ACCESS_TOKEN")
+    or _env_secret("FACEBOOK_ACCESS_TOKEN")
+    or _env_secret("FB_ACCESS_TOKEN")
+    or _env_secret("META_ACCESS_TOKEN")
 )
 
 # Récupération flexible de l'ID de Page (avec repli sur l'ID valide)
 FACEBOOK_PAGE_ID = (
-    os.getenv("FACEBOOK_PAGE_ID")
-    or os.getenv("FB_PAGE_ID")
+    _env_secret("FACEBOOK_PAGE_ID")
+    or _env_secret("FB_PAGE_ID")
     or "277418232940596"
 )
 
 # Récupération flexible d'Instagram
 INSTAGRAM_ACCOUNT_ID = (
-    os.getenv("INSTAGRAM_ACCOUNT_ID")
-    or os.getenv("IG_USER_ID")
-    or ""
+    _env_secret("INSTAGRAM_ACCOUNT_ID")
+    or _env_secret("IG_USER_ID")
 )
+
+# ── Diagnostic : alerte si un ID contient des caractères suspects ──
+for _id_name, _id_value in (
+    ("FACEBOOK_PAGE_ID", FACEBOOK_PAGE_ID),
+    ("INSTAGRAM_ACCOUNT_ID", INSTAGRAM_ACCOUNT_ID),
+):
+    if _id_value and not _id_value.isdigit():
+        logger.warning(
+            "⚠️  %s=%r… contient des caractères non numériques — "
+            "vérifiez le secret (saut de ligne / espace accidentel ?)",
+            _id_name, _id_value[:10],
+        )
 
 # ── Renouvellement automatique des tokens ────────────────────
 # Identifiants de l'application Facebook (nécessaires pour fb_exchange_token)
 # https://developers.facebook.com/apps/ → votre app → Paramètres → Identifiants
-FB_APP_ID = os.getenv("FB_APP_ID", "")
-FB_APP_SECRET = os.getenv("FB_APP_SECRET", "")
+FB_APP_ID = _env_secret("FB_APP_ID")
+FB_APP_SECRET = _env_secret("FB_APP_SECRET")
 
 # Nombre de jours entre deux renouvellements automatiques des tokens.
 # Les tokens Meta durent 60 jours — un renouvellement tous les
@@ -372,5 +415,9 @@ AI_LONG_POST_PROMPT_TEMPLATE = (
     "5. N'utilise que du français : pas d'anglais, pas d'emojis, pas de citation du titre exact.\n"
     "6. Le post doit se terminer par le lien de l'article : {url}\n"
     "\n"
-    "Renvoie UNIQUEMENT le texte du post, sans guillemets ni commentaire."
+    "Renvoie UNIQUEMENT un objet JSON valide (sans balises markdown, sans commentaire), "
+    "au format EXACT suivant :\n"
+    '{{"title": "<titre percutant de l\'article>", '
+    '"body": "<post court se terminant par {url} et les hashtags>", '
+    '"long_body": "<post long se terminant par {url} et les hashtags>"}}'
 )
