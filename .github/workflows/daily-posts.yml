@@ -1,0 +1,117 @@
+# Workflow GitHub Actions — Streetweb : 4 posts journaliers garantis.
+#
+# Remplace la planification du worker Render (qui s'endort) par des
+# exécutions GitHub Actions :
+#   - Déclenchement TOUTES LES HEURES (cron UTC) + un garde-fou bash
+#     qui ne publie que si l'heure de Paris correspond à un créneau
+#     planifié (07:00, 12:00, 17:00, 20:00 par défaut).
+#     → Gère automatiquement le passage heure d'été / heure d'hiver,
+#       contrairement à des crons UTC fixes.
+#   - La base SQLite anti-doublons est commitée dans le dépôt après
+#     chaque exécution pour persister entre les runs éphémères.
+#   - Déclenchement manuel possible via workflow_dispatch.
+
+name: Posts planifiés
+
+on:
+  schedule:
+    # Toutes les heures — le garde-fou horaire filtre sur les créneaux Paris
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Forcer la publication (ignorer le garde-fou horaire)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# Évite deux publications simultanées si un run traîne
+concurrency:
+  group: daily-posts
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Récupérer le code (+ base anti-doublons)
+        uses: actions/checkout@v4
+
+      - name: Configurer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      # ── Garde-fou horaire ────────────────────────────────────
+      # Ne publie que si l'heure de Paris est proche d'un créneau
+      # planifié (tolérance ±25 min pour absorber les délais de cron).
+      # Les créneaux sont lus depuis SCHEDULE_TIMES si défini en secret,
+      # sinon la valeur par défaut du code (07:00 12:00 17:00 20:00).
+      - name: Garde-fou horaire (heure de Paris)
+        id: guard
+        if: ${{ github.event_name == 'schedule' }}
+        env:
+          SCHEDULE_TIMES: ${{ secrets.SCHEDULE_TIMES }}
+        run: |
+          SLOTS="${SCHEDULE_TIMES:-07:00 12:00 17:00 20:00}"
+          SLOTS=$(echo "$SLOTS" | tr ',' ' ')
+          NOW=$(TZ=Europe/Paris date +%H:%M)
+          NOW_MIN=$((10#${NOW%%:*}*60 + 10#${NOW##*:}))
+          MATCH=false
+          for s in $SLOTS; do
+            SMIN=$((10#${s%%:*}*60 + 10#${s##*:}))
+            DIFF=$((NOW_MIN - SMIN))
+            [ "$DIFF" -lt 0 ] && DIFF=$((-DIFF))
+            if [ "$DIFF" -le 25 ]; then MATCH=true; fi
+          done
+          echo "match=$MATCH" >> "$GITHUB_OUTPUT"
+          echo "Heure de Paris : $NOW | Créneaux : $SLOTS | Publication : $MATCH"
+
+      # ── Génération + publication ─────────────────────────────
+      - name: Générer et publier le post
+        if: ${{ steps.guard.outputs.match != 'false' || github.event_name != 'schedule' }}
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          FB_APP_ID: ${{ secrets.FB_APP_ID }}
+          FB_APP_SECRET: ${{ secrets.FB_APP_SECRET }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          SMTP_ENABLED: ${{ secrets.SMTP_ENABLED }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          DRY_RUN: ${{ secrets.DRY_RUN || 'false' }}
+          DB_PATH: data/streetweb_bot.db
+        run: python run_once.py
+
+      # ── Persistance de la base anti-doublons ─────────────────
+      # Commitée même en cas d'échec de publication (les articles
+      # générés sont marqués « traités » pendant la génération).
+      - name: Sauvegarder la base anti-doublons
+        if: always()
+        env:
+          DB_PATH: data/streetweb_bot.db
+        run: |
+          git config user.name "streetweb-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$DB_PATH" 2>/dev/null || echo "Aucune base à committer"
+          if git diff --cached --quiet; then
+            echo "Base inchangée — rien à committer"
+          else
+            git commit -m "chore(db): mise à jour anti-doublons [skip ci]"
+            git push
+          fi

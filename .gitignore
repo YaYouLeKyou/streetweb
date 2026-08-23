@@ -20,6 +20,14 @@ env/
 news_bot.db
 *.db
 
+# Exception : la base anti-doublons CI est commitée par GitHub Actions
+# (les runners sont éphémères, la base doit persister dans le dépôt)
+!data/streetweb_bot.db
+
+# Fichiers temporaires SQLite (WAL) — jamais versionnés
+data/*-wal
+data/*-shm
+
 # OS
 Thumbs.db
 .DS_Store
